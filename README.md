@@ -1,6 +1,6 @@
 In order to make sure that we're using the same packages, please use the `hughes-min` environment included with this repo. 
 
-To create it:
+To create it, open a terminal (or an Anaconda powershell, depending on how you installed Anaconda) in this directory and run:
 
 `conda env create -f environment.yml`
 
