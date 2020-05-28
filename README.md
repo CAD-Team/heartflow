@@ -11,3 +11,5 @@ Before running the scripts, activate the environment:
 To run the simulations, which currently use scipy's iterative solvers, be sure to specify scipy matrices with `--matrix=Scipy`. For example:
 
 `python model_00_cropped_01_autoplaque_dirichlet.py --matrix=Scipy`
+
+NOTE: The data is not included in this repo. You'll have to download it and put it in the data/ folder
