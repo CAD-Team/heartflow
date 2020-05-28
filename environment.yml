@@ -14,4 +14,5 @@ dependencies:
     - treelog==1.0b5
     - stringly==1.0b1
     - typing-extensions==3.7.4.2
-    - nutils==6.0
+    - git+https://github.com/jeffrey-cochran/nutils.git
+    - black
