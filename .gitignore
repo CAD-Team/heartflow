@@ -2,3 +2,4 @@ data/*
 !data/README.md
 *.pyc
 *_ignore_*
+*.vtk
