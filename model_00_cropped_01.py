@@ -46,7 +46,7 @@ def ElasticityModulus(hu, label):
         return 1 / 1000
     elif label == 2:
         # artery blood
-        return CalcE(ShearModulus(hu, label), 2.2 * 1000)
+        return 1/1000
     elif label == 4:
         # calcified plaque
         return 10000 / 1000

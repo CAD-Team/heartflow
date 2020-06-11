@@ -321,7 +321,7 @@ def Run(L,Nx,Ny,Nz,Nu,Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degr
     pltpts = locatesample(samplepts, ns.rgeom, gauss_topo, gauss.x, 10000000000)
     r = samplepts.eval(ns.r)
     vonmises = pltpts.eval(gauss.vonmises)
-    meanstress = pltpts.eval(gauss.vonmises)
+    meanstress = pltpts.eval(gauss.meanstress)
     ur = pltpts.eval(gauss.u[0])
     ut = pltpts.eval(gauss.u[1])
     uz = pltpts.eval(gauss.u[2])
@@ -453,7 +453,7 @@ def MeshResolutionStudy():
     # inner pressure [mPa]
     pi = .012 
 
-    # Artery properties [mPa]
+    # cylinder wall properties [mPa]
     nu_wall =  0.3
     E_wall  =  .1
 
