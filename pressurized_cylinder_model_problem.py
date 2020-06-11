@@ -109,7 +109,7 @@ def GaussSort(x, topo, n):
 
 
 
-def Run(L,Nx,Ny,Nz,Nu,Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, figs, axs):
+def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples):
 
     # mat prop functions
     class PoissonRatio(function.Pointwise):
@@ -130,6 +130,7 @@ def Run(L,Nx,Ny,Nz,Nu,Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degr
     # thickness
     Navg = (Nx + Ny)/2
     t = L / (2 * Navg)
+    Nz = 1
 
     # background mesh
     omega = function.Namespace()
@@ -310,7 +311,6 @@ def Run(L,Nx,Ny,Nz,Nu,Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degr
 
 
     # Define slice
-    nSamples= 100
     ns = function.Namespace()
     topo, ns.t = mesh.rectilinear([np.linspace(ri,ro,nSamples+1)])
     ns.rgeom_i = '< t_0 / sqrt(2), t_0 / sqrt(2), 0 >_i'
@@ -334,32 +334,26 @@ def Run(L,Nx,Ny,Nz,Nu,Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degr
     sigmarz = pltpts.eval(gauss.sigmarz)
     sigmatz = pltpts.eval(gauss.sigmatz)
 
-    # 1D Plots
-
-    axs[0].plot(r, vonmises, label=label)
-
-    axs[1].plot(r, meanstress, label=label)
-
-    axs[2].plot(r, ur, label=label)
-
-    axs[3].plot(r, sigmarr, label=label)
-
-    axs[4].plot(r, sigmatt, label=label)
+    vals = {}
+    vals["vonmises"] = vonmises
+    vals["meanstress"] = meanstress
+    vals["ur"] = ur
+    vals["ut"] = ut
+    vals["uz"] = uz
+    vals["sigmarr"] = sigmarr
+    vals["sigmatt"] = sigmatt
+    vals["sigmazz"] = sigmazz
+    vals["sigmart"] = sigmart
+    vals["sigmarz"] = sigmarz
+    vals["sigmatz"] = sigmatz
 
     print("finished case: " + label)
 
-    return figs, axs
+    return r, vals
 
 
-def InitializePlots(n):
-    figs = {}
-    axs = {}
-    for i in range(n):
-        figs[i] = plt.figure()
-        axs[i] = figs[i].add_subplot(111)
-    return figs, axs
 
-def Plot(study_name, nSamples, ri, ro, pi, nu_wall, E_wall, figs, axs):
+def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
 
     # model problem name
     model_problem_name = "cylinder"
@@ -386,69 +380,146 @@ def Plot(study_name, nSamples, ri, ro, pi, nu_wall, E_wall, figs, axs):
     s.ur = 'C1 r + ( C2 / r )'
 
     # Sample Exact Solutions
+    vals = {}
     r = samplepts.eval(s.r)
-    vonmises_exact = samplepts.eval(s.vonmises)
-    meanstress_exact = samplepts.eval(s.meanstress)
-    ur_exact = samplepts.eval(s.ur)
-    sigmarr_exact = samplepts.eval(s.sigmarr)
-    sigmatt_exact = samplepts.eval(s.sigmatt)
+    vals["vonmises"] = samplepts.eval(s.vonmises)
+    vals["meanstress"] = samplepts.eval(s.meanstress)
+    vals["ur"] = samplepts.eval(s.ur)
+    vals["ut"] = np.zeros([nSamples])
+    vals["uz"] = np.zeros([nSamples])
+    vals["sigmarr"] = samplepts.eval(s.sigmarr)
+    vals["sigmatt"] = samplepts.eval(s.sigmatt)
+    vals["sigmazz"] = samplepts.eval(s.sigmazz)
+    vals["sigmart"] = np.zeros([nSamples])
+    vals["sigmarz"] = np.zeros([nSamples])
+    vals["sigmatz"] = np.zeros([nSamples])
 
-    # Plot Exact Solutions + save figure
-    axs[0].plot(r, vonmises_exact, label="exact")
-    axs[0].set_title('Von Mises Stress')
-    axs[0].set_xlabel('r')
-    axs[0].set_ylabel('$\sigma_{vonmises}$')
-    axs[0].legend()
-    name = "vonmises.png"
-    figs[0].savefig(model_problem_name + "_" + study_name + "_" + name)
-    print("saved /heartflow/" + model_problem_name + "_" + study_name + "_" + name)
+    return r, vals
 
-    axs[1].plot(r, meanstress_exact, label="exact")
-    axs[1].set_title('Mean Stress')
-    axs[1].set_xlabel('r')
-    axs[1].set_ylabel('$\sigma_{mean} $')
-    axs[1].legend()
-    name = "meanstress.png"
-    figs[1].savefig(model_problem_name + "_" + study_name + "_" + name)
-    print("saved /heartflow/" + model_problem_name + "_" + study_name + "_" + name)
+def InitializePlots(keys):
+    figs = {}
+    axs = {}
+    for key in keys:
+        figs[key] = plt.figure()
+        axs[key] = figs[key].add_subplot(111)
+    return figs, axs
 
-    axs[2].plot(r, ur_exact, label="exact")
-    axs[2].set_title('$ U_{r} $')
-    axs[2].set_xlabel('r')
-    axs[2].set_ylabel('$u_{r} $')
-    axs[2].legend()
-    name = "ur.png"
-    figs[2].savefig(model_problem_name + "_" + study_name + "_" + name)
-    print("saved /heartflow/" + model_problem_name + "_" + study_name + "_" + name)
+def Plot(axs, r, vals, label):
+    for key in axs.keys():
+        axs[key].plot(r, vals[key], label=label)
 
-    axs[3].plot(r, sigmarr_exact, label="exact")
-    axs[3].set_title('$\sigma_{rr} $')
-    axs[3].set_xlabel('r')
-    axs[3].set_ylabel('$\sigma_{rr} $')
-    axs[3].legend()
-    name = "sigmarr.png"
-    figs[3].savefig(model_problem_name + "_" + study_name + "_" + name)
-    print("saved /heartflow/" + model_problem_name + "_" + study_name + "_" + name)
 
-    axs[4].plot(r, sigmatt_exact, label="exact")
-    axs[4].set_title('$\sigma_{tt} $')
-    axs[4].set_xlabel('r')
-    axs[4].set_ylabel('$\sigma_{tt} $')
-    axs[4].legend()
-    name = "sigmatt.png"
-    figs[4].savefig(model_problem_name + "_" + study_name + "_" + name)
-    print("saved /heartflow/" + model_problem_name + "_" + study_name + "_" + name)
+def Export(model_problem_name, study_name, figs, axs):
 
-def MeshResolutionStudy():
+    for key in figs.keys():
+        axs[key].set_title(key)
+        axs[key].set_xlabel('r')
+        axs[key].set_ylabel(key)
+        axs[key].legend()
+        name = model_problem_name + "_" + study_name + "_" + key
+        figs[key].savefig()
+        print("saved /heartflow/" + name)
+
+def Normalize(normalization_factors, vals):
+    for key in normalization_factors:
+        vals[key] /= normalization_factors[key]
+
+def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, N):
+
+    # study name
+    study_name = "mesh_resolution"
+
+    # Study Arrays
+    nCases = len(N)
 
     # initialize plots
-    figs, axs = InitializePlots(5)
+    keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    figs, axs = InitializePlots(keys)
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in keys:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = "N = " + str(N[i])
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals = Run(L, N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)
+        # Normalize
+        Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs)
+
+    print("finished study: " + study_name)
+
+def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, nu_wall):
+
+    # study name
+    study_name = "compressibility"
+
+    # Study Arrays
+    nCases = len(nu_wall)
+
+    # initialize plots
+    keys = ["vonmises", "meanstress", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    figs, axs = InitializePlots(keys)
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in keys:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+        
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = "$ \nu_{wall} $ = " + str(nu_wall[i])
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)
+        # Normalize
+        Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs)
+
+    print("finished study: " + study_name)
+
+def main():
+
+    # DEFINE DEFAULT VALUES
+
+    # model problem name
+    model_problem_name = "cylinder"
 
     # outer radius
-    ro = 2
+    ro = 3.2 / 2
 
     # inner radius
-    ri = 1
+    ri = 1.75 / 2
 
     # inner pressure [mPa]
     pi = .012 
@@ -459,10 +530,7 @@ def MeshResolutionStudy():
 
     # Air properties [mPa]
     nu_air  =  0.0
-    E_air   =  0.01
-
-    # Domain size
-    L = ro * 1.5
+    E_air   =  0.00001
 
     # number immersed boundary elements
     Nu = 1000
@@ -472,42 +540,31 @@ def MeshResolutionStudy():
     basis_degree = 2
 
     # quadrature order
-    gauss_degree = 5
+    gauss_degree = 3
+
+    # Domain size
+    L = 2 * ro
 
     # number voxels
-    Nx = [50,100,150]
-    Ny = [50,100,150]
-    Nz = 1
+    Nx = 100
+    Ny = 100
 
     # number of plot sample points
     nSamples = 100
 
-    # loop cases
-    for i in range(len(Nx)):
+    ########################################
 
-        # label
-        label = "N = " + str(Nx[i])
+    # Run studies
 
-        # 3D Plot
-        PLOT3D = i == len(Nx) - 1
+    # Mesh Resolution Study
+    N = [50, 100, 150]
+    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name)
 
-        # Run
-        figs, axs = Run(L, Nx[i], Ny[i], Nz, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, figs, axs)
-
-
-    # export plots
-    study_name = "mesh_resolution"
-    Plot(study_name, nSamples, ri, ro, pi, nu_wall, E_wall, figs, axs)
-
-    print("finished study: " + study_name)
+    # Compressibility Study
+    nu_wall = [0.3, 0.4, 0.45, 0.49]
+    CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name)
 
 
-
-
-
-
-def main():
-    MeshResolutionStudy()
 
 
 if __name__ == '__main__':
