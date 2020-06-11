@@ -37,57 +37,49 @@ def CalcLambda(E, nu):
 def ElasticityModulus(hu, label):
     if label == 3:
         # Non Calcified Plaque
-        return 4.2 / 1000
+        return 1000 / 1000
     elif label == 0:
         # heart tissue
         return 60 / 1000
     elif label == 1:
         # artery wall
-        return 100 / 1000
+        return 1 / 1000
     elif label == 2:
         # artery blood
         return CalcE(ShearModulus(hu, label), 2.2 * 1000)
     elif label == 4:
         # calcified plaque
-        return 2.1e7 / 1000
+        return 10000 / 1000
 
 
 def ShearModulus(hu, label):
-    if label == 2:
-        # artery blood
-        return 1 / 1000
-    else:
-        nu = PoissonRatio(hu, label)
-        E = ElasticityModulus(hu, label)
-        return CalcShearModulus(E, nu)
+    nu = PoissonRatio(hu, label)
+    E = ElasticityModulus(hu, label)
+    return CalcShearModulus(E, nu)
 
 
 def PoissonRatio(hu, label):
     if label == 3:
         # Non Calcified Plaque
-        return 0.45
+        return 0.27
     elif label == 0:
         # heart tissue
-        return 0.45
+        return 0.4
     elif label == 1:
         # artery wall
-        return 0.45
+        return 0.27
     elif label == 2:
         # artery blood
-        return CalcPoisson(ShearModulus(hu, label), 2.2 * 1000)
+        return 0.0
     elif label == 4:
         # calcified plaque
-        return 0.27
+        return 0.31
 
 
 def BulkModulus(hu, label):
-    if label == 2:
-        # artery blood
-        return 2.2 * 1000
-    else:
-        nu = PoissonRatio(hu, label)
-        E = ElasticityModulus(hu, label)
-        return CalcBulkModulus(E, nu)
+    nu = PoissonRatio(hu, label)
+    E = ElasticityModulus(hu, label)
+    return CalcBulkModulus(E, nu)
 
 def nID(i, j, k, nez, ney, n):
     ii = i % n
@@ -263,16 +255,6 @@ def main():
 
     # Construct HU function
     omega.HU = omega.linbasis.dot(HU_vals)
-    omega.HUproj = omega_topo.projection(
-        omega.HU,
-        onto=omega_topo.basis("spline", degree=2),
-        geometry=omega.x,
-        ptype=ptype,
-        ischeme="gauss{}".format(2),
-        solver="cg",
-        atol=1e-5,
-        precon="diag"
-    )
 
     # Construct Label Function
     omega.label = omega.linbasis.dot(HU_labels)
@@ -291,80 +273,30 @@ def main():
     for i in range(len(HU_vals)):
         mu_vals[i] = ShearModulus(HU_vals[i], HU_labels[i])
     omega.mu = omega.linbasis.dot(mu_vals)
-    omega.muproj = omega_topo.projection(
-        omega.mu,
-        onto=omega_topo.basis("spline", degree=2),
-        geometry=omega.x,
-        ptype=ptype,
-        ischeme="gauss{}".format(2),
-        solver="cg",
-        atol=1e-10,
-        precon="diag"
-    )
 
     # Construct Elasticity Modulus Function
     E_vals = np.zeros(len(HU_vals))
     for i in range(len(HU_vals)):
         E_vals[i] = ElasticityModulus(HU_vals[i], HU_labels[i])
     omega.E = omega.linbasis.dot(E_vals)
-    omega.Eproj = omega_topo.projection(
-        omega.E,
-        onto=omega_topo.basis("spline", degree=2),
-        geometry=omega.x,
-        ptype=ptype,
-        ischeme="gauss{}".format(2),
-        solver="cg",
-        atol=1e-10,
-        precon="diag"
-    )
 
     # Construct Poisson Ratio Function
     poisson_vals = np.zeros(len(HU_vals))
     for i in range(len(HU_vals)):
         poisson_vals[i] = PoissonRatio(HU_vals[i], HU_labels[i])
     omega.poisson = omega.linbasis.dot(poisson_vals)
-    omega.poissonproj = omega_topo.projection(
-        omega.poisson,
-        onto=omega_topo.basis("spline", degree=2),
-        geometry=omega.x,
-        ptype=ptype,
-        ischeme="gauss{}".format(2),
-        solver="cg",
-        atol=1e-10,
-        precon="diag"
-    )
 
     # Construct Bulk Modulus Function
     K_vals = np.zeros(len(HU_vals))
     for i in range(len(HU_vals)):
         K_vals[i] = CalcBulkModulus(E_vals[i], poisson_vals[i])
     omega.K = omega.linbasis.dot(K_vals)
-    omega.Kproj = omega_topo.projection(
-        omega.K,
-        onto=omega_topo.basis("spline", degree=2),
-        geometry=omega.x,
-        ptype=ptype,
-        ischeme="gauss{}".format(2),
-        solver="cg",
-        atol=1e-10,
-        precon="diag"
-    )
 
     # Construct Lame parameter Function
     lmbda_vals = np.zeros(len(HU_vals))
     for i in range(len(HU_vals)):
         lmbda_vals[i] = CalcLambda(E_vals[i], poisson_vals[i])
     omega.lmbda = omega.linbasis.dot(lmbda_vals)
-    omega.lmbdaproj = omega_topo.projection(
-        omega.lmbda,
-        onto=omega_topo.basis("spline", degree=2),
-        geometry=omega.x,
-        ptype=ptype,
-        ischeme="gauss{}".format(2),
-        solver="cg",
-        atol=1e-10,
-        precon="diag"
-    )
 
     # Plot Omega
     # bezier = omega_topo.sample('bezier', 3)
@@ -510,17 +442,17 @@ def main():
     omega.trim = omega.linbasis.dot(trim)
 
     # Read Inner Wall Implicit Representation
-    trim_lumen_data = np.loadtxt("data\\trim_lumen.txt", skiprows=3).reshape( shape, order="F" )
+    trim_lumen_data = np.loadtxt("data\\trim_lumen_1.txt", skiprows=3).reshape( shape, order="F" )
 
     # Build Trimming Function
     trim_lumen = trim_lumen_data.reshape( [trim_data.shape[0] * trim_data.shape[1] * trim_data.shape[2], 1, 1], order="C" ).flatten()
-    omega.trimlumen = -omega.linbasis.dot(trim_lumen)
+    omega.trimlumen = omega.linbasis.dot(trim_lumen)
 
     # sample
     bezier = omega_topo.sample("gauss", deg)
     
     # eval
-    x, hu, E, nu, mu, K = bezier.eval(['x_i', 'HUproj', 'Eproj', 'poissonproj', 'muproj', 'Kproj'] @ omega)
+    x, hu, E, nu, mu, K = bezier.eval(['x_i', 'HU', 'E', 'poisson', 'mu', 'K'] @ omega)
     meanstress, meanstrain, vonmises, disp = bezier.eval(['meanstress', 'meanstrain', 'vonmises', 'disp'] @ omega, lhs=lhs)
     label, trim, trim_lumen = bezier.eval(['label', 'trim', 'trimlumen'] @ omega, lhs=lhs)
     normalizedvonmises, normalizedmeanstress = bezier.eval( ["normalizedvonmises", "normalizedmeanstress"] @ omega, lhs=lhs )
