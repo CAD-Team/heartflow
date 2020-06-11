@@ -3,3 +3,4 @@ data/*
 *.pyc
 *_ignore_*
 *.vtk
+*.[Pp][Nn][Gg]
