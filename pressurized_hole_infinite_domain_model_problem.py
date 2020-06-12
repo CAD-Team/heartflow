@@ -447,13 +447,111 @@ def Plot(study_name, nSamples, ri, L, pi, nu_wall, E_wall, figs, axs):
     figs[4].savefig(model_problem_name + "_" + study_name + "_" + name)
     print("saved /heartflow/" + model_problem_name + "_" + study_name + "_" + name)
 
-def MeshResolutionStudy():
+def DomainSizeStudy(ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples):
 
     # initialize plots
     figs, axs = InitializePlots(5)
 
+    # loop cases
+    for i in range(len(L)):
+
+        # label
+        label = "L = " + str(round(L[i],2))
+
+        # 3D Plot
+        PLOT3D = i == len(L) - 1
+
+        # Run
+        figs, axs = Run(L[i], Nx[i], Ny[i], 1, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, pi, basis_degree, gauss_degree, PLOT3D, label, figs, axs)
+
+
+    # export plots
+    study_name = "domain_size"
+    Plot(study_name, nSamples, ri, L[-1], pi, nu_wall, E_wall, figs, axs)
+
+    print("finished study: " + study_name)
+
+
+def MeshResolutionStudy(ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples):
+
+    # initialize plots
+    figs, axs = InitializePlots(5)
+
+    # loop cases
+    for i in range(len(Nx)):
+
+        # label
+        label = "N = " + str(Nx[i])
+
+        # 3D Plot
+        PLOT3D = i == len(Nx) - 1
+
+        # Run
+        figs, axs = Run(L, Nx[i], Ny[i], 1, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, pi, basis_degree, gauss_degree, PLOT3D, label, figs, axs)
+
+
+    # export plots
+    study_name = "mesh_resolution"
+    Plot(study_name, nSamples, ri, L, pi, nu_wall, E_wall, figs, axs)
+
+    print("finished study: " + study_name)
+
+
+def CompressibilityStudy(ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples):
+
+    # initialize plots
+    figs, axs = InitializePlots(5)
+
+    # loop cases
+    for i in range(len(nu_wall)):
+
+        # label
+        label = "nu = " + str(nu_wall[i])
+
+        # 3D Plot
+        PLOT3D = i == len(nu_wall) - 1
+
+        # Run
+        figs, axs = Run(L, Nx, Ny, 1, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, pi, basis_degree, gauss_degree, PLOT3D, label, figs, axs)
+
+
+    # export plots
+    study_name = "compressibility"
+    Plot(study_name, nSamples, ri, L, pi, nu_wall[-1], E_wall, figs, axs)
+
+    print("finished study: " + study_name)
+
+
+def AirPropertiesStudy(ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples):
+
+    # initialize plots
+    figs, axs = InitializePlots(5)
+
+    # loop cases
+    for i in range(len(E_air)):
+
+        # label
+        label = "E = " + str(E_air[i])
+
+        # 3D Plot
+        PLOT3D = i == len(E_air) - 1
+
+        # Run
+        figs, axs = Run(L, Nx, Ny, 1, Nu, Nv, nu_wall, E_wall, nu_air, E_air[i], ri, pi, basis_degree, gauss_degree, PLOT3D, label, figs, axs)
+
+
+    # export plots
+    study_name = "airproperties"
+    Plot(study_name, nSamples, ri, ro, pi, nu_wall[-1], E_wall, figs, axs)
+
+    print("finished study: " + study_name)
+
+
+def main():
+
     # inner radius
-    ri = 1
+    ri = 1.75 / 2
+
 
     # inner pressure [mPa]
     pi = .012 
@@ -466,9 +564,6 @@ def MeshResolutionStudy():
     nu_air  =  0.0
     E_air   =  0.01
 
-    # Domain size factor
-    Lf = [1.5, 2]
-
     # number immersed boundary elements
     Nu = 1000
     Nv = 10
@@ -477,47 +572,21 @@ def MeshResolutionStudy():
     basis_degree = 2
 
     # quadrature order
-    gauss_degree = 5
+    gauss_degree = 3
 
     # number voxels on [0,ri] X [0,ri]
-    N = 50
+    Nx = [50, 100, 150]
+    Ny = [50, 100, 150]
+
+    # Domain size factor
+    L = [1.1 * ri, 1.5 * ri, 2 * ri]
 
     # number of plot sample points
     nSamples = 100
 
-    # loop cases
-    for i in range(len(Lf)):
-        # Number of elements
-        Nx = int(np.ceil(Lf[i] * N))
-        Ny = Nx
 
-        # Domain size
-        L = Lf[i] * ri
-
-        # label
-        label = "Lf = " + str(Lf[i])
-
-        # 3D Plot
-        PLOT3D = i == len(Lf) - 1
-
-        # Run
-        figs, axs = Run(L, Nx, Ny, 1, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, pi, basis_degree, gauss_degree, PLOT3D, label, figs, axs)
-
-
-    # export plots
-    study_name = "mesh_resolution"
-    Plot(study_name, nSamples, ri, ri * Lf[-1], pi, nu_wall, E_wall, figs, axs)
-
-    print("finished study: " + study_name)
-
-
-
-
-
-
-def main():
-    MeshResolutionStudy()
-
+    DomainSizeStudy(ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples)
+    MeshResolutionStudy(ri, pi, nu_wall, E_wall, nu_air, E_air, L[1], Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples):
 
 if __name__ == '__main__':
 	cli.run(main)

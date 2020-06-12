@@ -2,6 +2,7 @@ from nutils import*
 from nutils.pointsseq import PointsSequence
 import numpy as np
 from matplotlib import pyplot as plt
+import os
 
 
 def locatesample(fromsample, fromgeom, totopo, togeom, tol, **kwargs):
@@ -108,8 +109,22 @@ def GaussSort(x, topo, n):
     return y
 
 
+def Constrain(omega_topo, omega, basis_degree, BC_TYPE):
+    # Constrain Omega
+    sqr  = omega_topo.boundary['left'].integral('u_0 u_0 d:x' @ omega, degree = 2*basis_degree)
+    sqr += omega_topo.boundary['bottom'].integral('u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
 
-def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples):
+    if BC_TYPE == "D":
+        sqr += omega_topo.boundary['top'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
+        sqr += omega_topo.boundary['right'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
+
+    sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree = 2*basis_degree)
+    cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
+
+    return cons
+
+
+def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples):
 
     # mat prop functions
     class PoissonRatio(function.Pointwise):
@@ -219,12 +234,7 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     F = sample_trimmed_omega.integral('traction_i Jgamma ubasis_ni' @ omega)
 
     # Constrain Omega
-    sqr  = omega_topo.boundary['left'].integral('u_0 u_0 d:x' @ omega, degree = 2*basis_degree)
-    sqr += omega_topo.boundary['bottom'].integral('u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
-    # sqr += omega_topo.boundary['top'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
-    # sqr += omega_topo.boundary['right'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
-    sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree = 2*basis_degree)
-    cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
+    cons = Constrain(omega_topo, omega, basis_degree, BC_TYPE)
 
     # Solve
     lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='cg', linatol=1e-7, linprecon='diag')
@@ -416,18 +426,28 @@ def Export(model_problem_name, study_name, figs, axs):
         axs[key].set_xlabel('r')
         axs[key].set_ylabel(key)
         axs[key].legend()
-        name = model_problem_name + "_" + study_name + "_" + key
-        figs[key].savefig()
-        print("saved /heartflow/" + name)
+        fdir = model_problem_name + "/" + study_name
+        fname = key
+        fext = ".png"
+        fpath = fdir + "/" + fname + fext
+        if not os.path.exists(fdir):
+            os.makedirs(fdir)
+        figs[key].savefig(fpath)
+        print("saved /heartflow/" + fpath)
+
+def CloseFigs(figs):
+    for key in figs:
+        plt.close(figs[key])
 
 def Normalize(normalization_factors, vals):
     for key in normalization_factors:
         vals[key] /= normalization_factors[key]
+    return vals
 
-def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, N):
+def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, BC_TYPE, N):
 
     # study name
-    study_name = "mesh_resolution"
+    study_name = "mesh_resolution_" + BC_TYPE 
 
     # Study Arrays
     nCases = len(N)
@@ -445,6 +465,8 @@ def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, b
         max_val = np.max(np.abs(vals_exact[key]))
         max_vals[key] = 1 if max_val == 0 else max_val
 
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
     # Plot Exact Solution
     Plot(axs, r_exact, vals_exact, 'exact')
 
@@ -455,21 +477,23 @@ def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, b
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L, N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)
+        r, vals = Run(L, N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
-        Normalize(max_vals, vals)
+        vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs)
 
+    # close figs
+    CloseFigs(figs)
+
     print("finished study: " + study_name)
 
-def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, nu_wall):
-
+def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, BC_TYPE, nu_wall):
     # study name
-    study_name = "compressibility"
+    study_name = "compressibility_" + BC_TYPE 
 
     # Study Arrays
     nCases = len(nu_wall)
@@ -479,14 +503,16 @@ def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, b
     figs, axs = InitializePlots(keys)
 
     # exact solution
-    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall[0], E_wall, nSamples)
 
     # normalization factors
     max_vals = {}
     for key in keys:
         max_val = np.max(np.abs(vals_exact[key]))
         max_vals[key] = 1 if max_val == 0 else max_val
-        
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
     # Plot Exact Solution
     Plot(axs, r_exact, vals_exact, 'exact')
 
@@ -497,16 +523,20 @@ def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, b
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)
+        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
-        Normalize(max_vals, vals)
+        vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs)
 
+    # close figs
+    CloseFigs(figs)
+
     print("finished study: " + study_name)
+
 
 def main():
 
@@ -552,26 +582,25 @@ def main():
     # number of plot sample points
     nSamples = 100
 
+    # Boundary condition type: "D" for Dirichlet or "N" for Neumann
+    BC_TYPE = "N"
+
     ########################################
 
     # Run studies
 
     # Mesh Resolution Study
     N = [50, 100, 150]
-    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name)
+    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "D", N)
+    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", N)
 
     # Compressibility Study
     nu_wall = [0.3, 0.4, 0.45, 0.49]
-    CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name)
+    CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "D", nu_wall)
+    CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", nu_wall)
 
 
 
 
 if __name__ == '__main__':
 	cli.run(main)
-
-
-# to add plot:
-# 1) change n in InializePlots(n) call
-# 2) add an exact solution and figure processing in the Plot() method
-# 3) add a plot call in the Run method
