@@ -572,7 +572,7 @@ def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, b
         Plot(axs, r, vals, label)
 
     # export plots
-    Export(model_problem_name, study_name, figs, axs)
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
 
     # close figs
     CloseFigs(figs)
