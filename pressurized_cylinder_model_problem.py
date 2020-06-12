@@ -441,13 +441,13 @@ def Normalize(normalization_factors, vals):
         vals[key] /= normalization_factors[key]
     return vals
 
-def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, BC_TYPE, N):
+def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "mesh_resolution_" + BC_TYPE 
 
     # Study Arrays
-    nCases = len(N)
+    nCases = len(Nx)
 
     # initialize plots
     keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
@@ -494,11 +494,11 @@ def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, b
     # loop cases
     for i in range(nCases):
         # label
-        label = "N = " + str(N[i])
+        label = str(Nx[i]) + " X " + str(Ny[i]) + " X " + str(1) + " elements"
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L, N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals = Run(L, Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -512,7 +512,7 @@ def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, b
 
     print("finished study: " + study_name)
 
-def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, BC_TYPE, nu_wall):
+def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
     # study name
     study_name = "compressibility_" + BC_TYPE 
 
@@ -580,7 +580,7 @@ def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, b
 
 
 
-def DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, BC_TYPE, L, N):
+def DomainPaddingStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "domain_padding_" + BC_TYPE 
@@ -637,6 +637,80 @@ def DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
+        r, vals = Run(L[i], Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        # Normalize
+        vals = Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
+
+    # close figs
+    CloseFigs(figs)
+
+    print("finished study: " + study_name)
+
+
+
+
+def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+
+    # study name
+    study_name = "air_properties_" + BC_TYPE 
+
+    # Study Arrays
+    nCases = len(E_air)
+
+    # initialize plots
+    keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmazz"] = "Axial Stress"
+    titles["sigmart"] = "$ r - \\theta Shear Stress $"
+    titles["sigmarz"] = "r - z Shear Stress"
+    titles["sigmatz"] = "$ \\theta - z Shear Stress $"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
+    figs, axs = InitializePlots(keys)
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in keys:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = "$E_{air} = $" + str(E_air[i])
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
         r, vals = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
@@ -650,6 +724,224 @@ def DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis
     CloseFigs(figs)
 
     print("finished study: " + study_name)
+
+
+def QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+
+    # study name
+    study_name = "quadrature_rule_" + BC_TYPE 
+
+    # Study Arrays
+    nCases = len(gauss_degree)
+
+    # initialize plots
+    keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmazz"] = "Axial Stress"
+    titles["sigmart"] = "$ r - \\theta Shear Stress $"
+    titles["sigmarz"] = "r - z Shear Stress"
+    titles["sigmatz"] = "$ \\theta - z Shear Stress $"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
+    figs, axs = InitializePlots(keys)
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in keys:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        n = int(np.ceil((gauss_degree[i]+1)/2))
+        label = "n = " + str(n) + " x " + str(n) + " x " + str(n)
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        # Normalize
+        vals = Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
+
+    # close figs
+    CloseFigs(figs)
+
+    print("finished study: " + study_name)
+
+
+def BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+
+    # study name
+    study_name = "basis_degree_" + BC_TYPE 
+
+    # Study Arrays
+    nCases = len(basis_degree)
+
+    # initialize plots
+    keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmazz"] = "Axial Stress"
+    titles["sigmart"] = "$ r - \\theta Shear Stress $"
+    titles["sigmarz"] = "r - z Shear Stress"
+    titles["sigmatz"] = "$ \\theta - z Shear Stress $"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
+    figs, axs = InitializePlots(keys)
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in keys:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = "p = " + str(basis_degree[i])
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree[i], gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        # Normalize
+        vals = Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
+
+    # close figs
+    CloseFigs(figs)
+
+    print("finished study: " + study_name)
+
+
+def ImmersedBoundaryResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+
+    # study name
+    study_name = "boundary_resolution_" + BC_TYPE 
+
+    # Study Arrays
+    nCases = len(Nu)
+
+    # initialize plots
+    keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmazz"] = "Axial Stress"
+    titles["sigmart"] = "$ r - \\theta Shear Stress $"
+    titles["sigmarz"] = "r - z Shear Stress"
+    titles["sigmatz"] = "$ \\theta - z Shear Stress $"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
+    figs, axs = InitializePlots(keys)
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in keys:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = str(Nu[i]) + " X " + str(Nv[i]) + " elements"
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals = Run(L, Nx, Ny, Nu[i], Nv[i], nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        # Normalize
+        vals = Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
+
+    # close figs
+    CloseFigs(figs)
+
+    print("finished study: " + study_name)
+
 
 def main():
 
@@ -672,8 +964,8 @@ def main():
     E_wall  =  0.1
 
     # Air properties [mPa]
-    nu_air  =  0.3
-    E_air   =  0.1
+    nu_air  =  0.0
+    E_air   =  0.001 * E_wall
 
     # number immersed boundary elements
     Nu = 1000
@@ -703,22 +995,41 @@ def main():
     # Run studies
 
     # Mesh Resolution Study
-    N = [10]
-    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", N)
-    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "D", N)
+    N = [50, 100, 150]
+    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
+    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
     # Compressibility Study
-    nu_wall = [0.3, 0.4, 0.45, 0.49]
-    CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "D", nu_wall)
-    CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", nu_wall)
+    poisson_ratios = [0.3, 0.4, 0.45, 0.49]
+    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
+    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
-    # Mesh Resolution Study
-    N = [10]
-    L = [1.1]
-    DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", L, N)
-    DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", L, N)
+    # Basis Degree Study
+    p = [1,2,3]
+    BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, "D", nSamples, model_problem_name)
+    BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, "N", nSamples, model_problem_name)
 
+    # Quadrature Rule Study
+    pgauss = [2,3]
+    QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "D", nSamples, model_problem_name)
+    QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "N", nSamples, model_problem_name)
 
+    # Air Properties Study
+    Ea = [.01 * E_wall, .001 * E_wall, .0001 * E_wall]
+    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
+    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
+
+    # Domain Padding Study
+    size = [1.1 * ro, 1.5 *ro, 2.5 * ro]
+    N = int(np.ceil([Nx * 1.1, Nx * 1.5, Nx * 2.5]))
+    DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
+    DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
+
+    # Immersed Boundary Resolution Study
+    nu_elems = [100, 500, 1000]
+    nv_elems = [10, 50, 100]
+    ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
+    ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
 
 if __name__ == '__main__':
