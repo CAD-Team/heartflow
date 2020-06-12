@@ -386,7 +386,7 @@ def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
     s.meanstress = '( sigmatt + sigmarr + sigmazz ) / 3'
     s.vonmises = 'sqrt(  ( (sigmarr - sigmatt)^2 + (sigmatt - sigmazz)^2 + (sigmazz - sigmarr)^2  ) / 2  )'
     s.C1 = '(1 - nu) ((ri^2 pi) / (ro^2 - ri^2)) / E'
-    s.C2 = '(1 - nu) ((ri^2 ro^2 pi) / (ro^2 - ri^2)) / E'
+    s.C2 = '(1 + nu) ((ri^2 ro^2 pi) / (ro^2 - ri^2)) / E'
     s.ur = 'C1 r + ( C2 / r )'
 
     # Sample Exact Solutions
@@ -419,12 +419,12 @@ def Plot(axs, r, vals, label):
         axs[key].plot(r, vals[key], label=label)
 
 
-def Export(model_problem_name, study_name, figs, axs):
+def Export(model_problem_name, study_name, figs, axs, titles, ylabels):
 
     for key in figs.keys():
-        axs[key].set_title(key)
+        axs[key].set_title(titles[key])
         axs[key].set_xlabel('r')
-        axs[key].set_ylabel(key)
+        axs[key].set_ylabel(ylabels[key])
         axs[key].legend()
         fdir = model_problem_name + "/" + study_name
         fname = key
@@ -454,6 +454,30 @@ def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, b
 
     # initialize plots
     keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    title["sigmatt"] = "Hoop Stress"
+    title["sigmazz"] = "Axial Stress"
+    title["sigmart"] = "$ r - \theta Shear Stress $"
+    title["sigmarz"] = "r - z Shear Stress"
+    title["sigmatz"] = "$ \theta - z Shear Stress $"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\theta \theta} / sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{rt}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{tz}$"
     figs, axs = InitializePlots(keys)
 
     # exact solution
@@ -484,7 +508,7 @@ def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, b
         Plot(axs, r, vals, label)
 
     # export plots
-    Export(model_problem_name, study_name, figs, axs)
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
 
     # close figs
     CloseFigs(figs)
@@ -500,6 +524,24 @@ def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, b
 
     # initialize plots
     keys = ["vonmises", "meanstress", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["sigmarr"] = "Radial Stress"
+    title["sigmatt"] = "Hoop Stress"
+    title["sigmazz"] = "Axial Stress"
+    title["sigmart"] = "$ r - \theta Shear Stress $"
+    title["sigmarz"] = "r - z Shear Stress"
+    title["sigmatz"] = "$ \theta - z Shear Stress $"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\theta \theta} / sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{rt}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{tz}$"
     figs, axs = InitializePlots(keys)
 
     # exact solution
