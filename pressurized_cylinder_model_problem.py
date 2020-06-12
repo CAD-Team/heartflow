@@ -109,21 +109,6 @@ def GaussSort(x, topo, n):
     return y
 
 
-def Constrain(omega_topo, omega, basis_degree, BC_TYPE):
-    # Constrain Omega
-    sqr  = omega_topo.boundary['left'].integral('u_0 u_0 d:x' @ omega, degree = 2*basis_degree)
-    sqr += omega_topo.boundary['bottom'].integral('u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
-
-    if BC_TYPE == "D":
-        sqr += omega_topo.boundary['top'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
-        sqr += omega_topo.boundary['right'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
-
-    sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree = 2*basis_degree)
-    cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
-
-    return cons
-
-
 def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples):
 
     # mat prop functions
@@ -234,10 +219,22 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     F = sample_trimmed_omega.integral('traction_i Jgamma ubasis_ni' @ omega)
 
     # Constrain Omega
-    cons = Constrain(omega_topo, omega, basis_degree, BC_TYPE)
+    sqr  = omega_topo.boundary['left'].integral('u_0 u_0 d:x' @ omega, degree = 2*basis_degree)
+    sqr += omega_topo.boundary['bottom'].integral('u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
+
+    if BC_TYPE == "D":
+        sqr += omega_topo.boundary['top'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
+        sqr += omega_topo.boundary['right'].integral('u_0 u_0 + u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
+
+    sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree = 2*basis_degree)
+    cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
 
     # Solve
     lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='cg', linatol=1e-7, linprecon='diag')
+    #lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='fgmres', linatol=1e-7, linprecon='diag')
+    #lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='fgmres', linatol=1e-7)
+
+    #lhs = solver.solve_linear('lhs', K-F, constrain = cons)
 
     samplepts = omega_topo.sample('gauss', gauss_degree)
     x = samplepts.eval(omega.x)
@@ -463,21 +460,21 @@ def MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, b
     titles["sigmarr"] = "Radial Stress"
     titles["sigmatt"] = "Hoop Stress"
     titles["sigmazz"] = "Axial Stress"
-    titles["sigmart"] = "$ r - \theta Shear Stress $"
+    titles["sigmart"] = "$ r - \\theta Shear Stress $"
     titles["sigmarz"] = "r - z Shear Stress"
-    titles["sigmatz"] = "$ \theta - z Shear Stress $"
+    titles["sigmatz"] = "$ \\theta - z Shear Stress $"
     ylabels = {}
     ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
     ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
     ylabels["ur"] = "$u_{r} / u_{0}$"
-    ylabels["ut"] = "$u_{\theta}$"
+    ylabels["ut"] = "$u_{\\theta}$"
     ylabels["uz"] = "$u_{z}$"
     ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
-    ylabels["sigmatt"] = "$\sigma_{\theta \theta} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / sigma_{0}$"
     ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
-    ylabels["sigmart"] = "$\sigma_{rt}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
     ylabels["sigmarz"] = "$\sigma_{rz}$"
-    ylabels["sigmatz"] = "$\sigma_{tz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
     figs, axs = InitializePlots(keys)
 
     # exact solution
@@ -530,18 +527,18 @@ def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, b
     titles["sigmarr"] = "Radial Stress"
     titles["sigmatt"] = "Hoop Stress"
     titles["sigmazz"] = "Axial Stress"
-    titles["sigmart"] = "$ r - \theta Shear Stress $"
+    titles["sigmart"] = "$ r - \\theta Shear Stress $"
     titles["sigmarz"] = "r - z Shear Stress"
-    titles["sigmatz"] = "$ \theta - z Shear Stress $"
+    titles["sigmatz"] = "$ \\theta - z Shear Stress $"
     ylabels = {}
     ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
     ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
     ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
-    ylabels["sigmatt"] = "$\sigma_{\theta \theta} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / sigma_{0}$"
     ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
-    ylabels["sigmart"] = "$\sigma_{rt}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
     ylabels["sigmarz"] = "$\sigma_{rz}$"
-    ylabels["sigmatz"] = "$\sigma_{tz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
     figs, axs = InitializePlots(keys)
 
     # exact solution
@@ -580,6 +577,80 @@ def CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, b
     print("finished study: " + study_name)
 
 
+
+
+
+def DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, BC_TYPE, L, N):
+
+    # study name
+    study_name = "domain_padding_" + BC_TYPE 
+
+    # Study Arrays
+    nCases = len(L)
+
+    # initialize plots
+    keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmazz"] = "Axial Stress"
+    titles["sigmart"] = "$ r - \\theta Shear Stress $"
+    titles["sigmarz"] = "r - z Shear Stress"
+    titles["sigmatz"] = "$ \\theta - z Shear Stress $"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
+    figs, axs = InitializePlots(keys)
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in keys:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = "L = " + str(round(L[i],2))
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        # Normalize
+        vals = Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
+
+    # close figs
+    CloseFigs(figs)
+
+    print("finished study: " + study_name)
+
 def main():
 
     # DEFINE DEFAULT VALUES
@@ -598,11 +669,11 @@ def main():
 
     # cylinder wall properties [mPa]
     nu_wall =  0.3
-    E_wall  =  .1
+    E_wall  =  0.1
 
     # Air properties [mPa]
-    nu_air  =  0.0
-    E_air   =  0.00001
+    nu_air  =  0.3
+    E_air   =  0.1
 
     # number immersed boundary elements
     Nu = 1000
@@ -632,14 +703,20 @@ def main():
     # Run studies
 
     # Mesh Resolution Study
-    N = [50, 100, 150]
-    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "D", N)
+    N = [10]
     MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", N)
+    MeshResolutionStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, L, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "D", N)
 
     # Compressibility Study
     nu_wall = [0.3, 0.4, 0.45, 0.49]
     CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "D", nu_wall)
     CompressibilityStudy(ro, ri, pi, E_wall, nu_air, E_air, L, Nx, Ny, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", nu_wall)
+
+    # Mesh Resolution Study
+    N = [10]
+    L = [1.1]
+    DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", L, N)
+    DomainPaddingStudy(ro, ri, pi, nu_wall, E_wall, nu_air, E_air, Nu, Nv, basis_degree, gauss_degree, nSamples, model_problem_name, "N", L, N)
 
 
 
