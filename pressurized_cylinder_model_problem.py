@@ -429,7 +429,7 @@ def Export(model_problem_name, study_name, figs, axs):
         fdir = model_problem_name + "/" + study_name
         fname = key
         fext = ".png"
-        fpath = fdir + "/" + fname + fext
+        fpath = "Results/" + fdir + "/" + fname + fext
         if not os.path.exists(fdir):
             os.makedirs(fdir)
         figs[key].savefig(fpath)
