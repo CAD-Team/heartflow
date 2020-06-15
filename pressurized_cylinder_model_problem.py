@@ -120,12 +120,12 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
 
     # Thickness
     Navg = (Nr + Nt)/2
-    t = L / (2 * Navg)
+    t = (ro - ri) / (2 * Navg)
     Nz = 1
 
     u = np.linspace(0, np.pi/2, Nt+1)
     v = np.linspace(ri, ro, Nr+1)
-    w = np.linspace(-t/2,t/2, Nz+1)
+    w = np.linspace(-t,t, Nz+1)
 
     omega_topo, omega.uvw = mesh.rectilinear([u,v,w])
     omega.x_i = '<uvw_1 cos(uvw_0) , uvw_1 sin(uvw_0) , uvw_2 >_i'
@@ -167,7 +167,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
 
     # Constrain Omega
     sqr  = omega_topo.boundary['right'].integral('u_0 u_0 d:x' @ omega, degree=2*basis_degree)
-    sqr += omega_topo.boundary['left'].integral('u_1 u_1 d:x' @ omega, degree=2*bassis_degree)
+    sqr += omega_topo.boundary['left'].integral('u_1 u_1 d:x' @ omega, degree=2*basis_degree)
     sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree=2*basis_degree)
     cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
 
@@ -262,7 +262,8 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
 
     # Define slice
     ns = function.Namespace()
-    topo, ns.t = mesh.rectilinear([np.linspace(ri,ro,nSamples+1)])
+    eps = (ro - ri) / Nr
+    topo, ns.t = mesh.rectilinear([np.linspace(ri+eps,ro-eps,nSamples+1)])
     ns.rgeom_i = '< t_0 / sqrt(2), t_0 / sqrt(2), 0 >_i'
     ns.r = 't_0'
 
@@ -662,7 +663,7 @@ def Normalize(normalization_factors, vals):
     return vals
 
 
-def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples, model_problem_name):
+def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, nSamples, model_problem_name):
 
     # study name
     study_name = "boundary_fitted" 
@@ -715,11 +716,12 @@ def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis
     # loop cases
     for i in range(nCases):
         # label
-        label = str(Nx[i]) + " X " + str(Ny[i]) + " X " + str(1) + " elements"
+        label = str(Nr[i]) + " X " + str(Nt[i]) + " X " + str(1) + " elements"
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals, res = BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)        # Normalize
+        r, vals, res = BoundaryFittedSolution(Nr[i], Nt[i], nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)
+        # normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
@@ -1306,11 +1308,11 @@ def main():
 
     # Mesh Resolution Study
     N = [100]
-    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
+    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
+    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
-    Nr = [50]
-    Nt = [200]
+    Nr = [20, 200]
+    Nt = [40, 400]
     BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, nSamples, model_problem_name)
     '''
     # Compressibility Study
