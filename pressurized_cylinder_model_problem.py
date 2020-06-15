@@ -108,6 +108,200 @@ def GaussSort(x, topo, n):
     print(y)
     return y
 
+def Solve(res, cons, callback):
+    return solver.solve_linear('lhs', residual=res, constrain=cons, linsolver='cg', linatol=1e-14, linprecon='diag', lincallback=callback)
+
+
+def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples):
+
+
+    # background mesh
+    omega = function.Namespace()
+
+    # Thickness
+    Navg = (Nr + Nt)/2
+    t = L / (2 * Navg)
+    Nz = 1
+
+    u = np.linspace(0, np.pi/2, Nt+1)
+    v = np.linspace(ri, ro, Nr+1)
+    w = np.linspace(-t/2,t/2, Nz+1)
+
+    omega_topo, omega.uvw = mesh.rectilinear([u,v,w])
+    omega.x_i = '<uvw_1 cos(uvw_0) , uvw_1 sin(uvw_0) , uvw_2 >_i'
+    
+    omega.pi = pi
+    omega.traction_i = '<pi cos(uvw_0), pi sin(uvw_0) , 0 >_i'
+    
+
+    # Add Mat Props functions to namespace
+    omega.nu = nu_wall
+    omega.E = E_wall
+    omega.mu = 'E / (2 (1 + nu))'
+    omega.lmbda = 'E nu / ( (1 + nu) (1 - 2 nu) )'
+
+    # Define Analysis
+    omega.basis = omega_topo.basis('spline',degree = basis_degree)
+    omega.ubasis = omega.basis.vector(3)
+    omega.u_i = 'ubasis_ni ?lhs_n'
+    omega.X_i = 'x_i + u_i'
+    omega.strain_ij = '(u_i,j + u_j,i) / 2'
+    omega.stress_ij = 'lmbda strain_kk δ_ij + 2 mu strain_ij'
+    omega.meanstrain = 'strain_kk / 3'
+    omega.meanstress = 'stress_kk / 3'
+    omega.S_ij = 'stress_ij - (stress_kk) δ_ij / 3'
+    omega.vonmises = 'sqrt(3 S_ij S_ij / 2)'
+    omega.disp = 'sqrt(u_i u_i)'
+    omega.r = 'sqrt( x_i x_i )'
+    omega.cos = 'x_0 / r'
+    omega.sin = 'x_1 / r'
+    omega.Qinv_ij = '< < cos , sin , 0 >_j , < -sin , cos , 0 >_j , < 0 , 0 , 1 >_j >_i'
+    omega.sigma_kl = 'stress_ij Qinv_kj Qinv_li '
+    omega.du_i = 'Qinv_ij u_j'
+    
+    # Stiffness Matrix
+    K = omega_topo.integral('ubasis_ni,j stress_ij d:x' @ omega, degree = gauss_degree)
+
+    # Force Vector
+    F = omega_topo.boundary['bottom'].integral('traction_i ubasis_ni d:x' @ omega, degree=gauss_degree)
+
+    # Constrain Omega
+    sqr  = omega_topo.boundary['right'].integral('u_0 u_0 d:x' @ omega, degree=2*basis_degree)
+    sqr += omega_topo.boundary['left'].integral('u_1 u_1 d:x' @ omega, degree=2*bassis_degree)
+    sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree=2*basis_degree)
+    cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
+
+    # Initialize Residual Vector
+    residuals = []
+    def AddResiualNorm(res):
+        residuals.append(res)
+
+    # Solve
+    lhs = Solve(K-F, cons, AddResiualNorm)
+
+    samplepts = omega_topo.sample('gauss', gauss_degree)
+    x = samplepts.eval(omega.x)
+    E, nu = samplepts.eval([omega.E, omega.nu])
+    meanstress, vonmises, disp = samplepts.eval(['meanstress', 'vonmises', 'du_i'] @ omega, lhs=lhs)
+    sigmarr, sigmatt, sigmazz, sigmart, sigmatz, sigmarz = samplepts.eval(['sigma_00', 'sigma_11','sigma_22', 'sigma_01','sigma_12', 'sigma_02'] @ omega, lhs=lhs)
+
+    # Gauss Mesh
+    gauss = function.Namespace()
+    n = int(np.ceil((gauss_degree+1)/2))
+    nx = omega_topo.shape[0] * n
+    ny = omega_topo.shape[1] * n
+    nz = omega_topo.shape[2] * n
+    gx = np.linspace(0,1,nx)
+    gy = np.linspace(0,1,ny)
+    gz = np.linspace(0,1,nz)
+    gauss_topo, gauss.uvw = mesh.rectilinear([gx,gy,gz])
+
+    # copy and sort samples
+    x_sorted = x.copy()
+    meanstress_sorted = meanstress.copy()
+    vonmises_sorted = vonmises.copy()
+    E_sorted = E.copy()
+    nu_sorted = nu.copy()
+    disp_sorted = disp.copy()
+    sigmarr_sorted = sigmarr.copy()
+    sigmatt_sorted = sigmatt.copy()
+    sigmazz_sorted = sigmazz.copy()
+    sigmart_sorted = sigmart.copy()
+    sigmarz_sorted = sigmarz.copy()
+    sigmatz_sorted = sigmatz.copy()
+
+
+    ind = 0
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                nid = nID(i, j, k, omega_topo.shape[2], omega_topo.shape[1], n)
+                x_sorted[ind] = x[nid]
+                meanstress_sorted[ind] = meanstress[nid]
+                vonmises_sorted[ind] = vonmises[nid]
+                E_sorted[ind] = E[nid]
+                nu_sorted[ind] = nu[nid]
+                disp_sorted[ind] = disp[nid]
+                sigmarr_sorted[ind] = sigmarr[nid]
+                sigmatt_sorted[ind] = sigmatt[nid]
+                sigmazz_sorted[ind] = sigmazz[nid]
+                sigmart_sorted[ind] = sigmart[nid]
+                sigmarz_sorted[ind] = sigmarz[nid]
+                sigmatz_sorted[ind] = sigmatz[nid]
+                ind = ind + 1
+
+
+    # create gauss sample interpolants
+    gauss.linbasis = gauss_topo.basis('spline',degree=1)
+    gauss.xx = gauss.linbasis.dot(x_sorted[:,0])
+    gauss.yy = gauss.linbasis.dot(x_sorted[:,1])
+    gauss.zz = gauss.linbasis.dot(x_sorted[:,2])
+    gauss.ur = gauss.linbasis.dot(disp_sorted[:,0])
+    gauss.ut = gauss.linbasis.dot(disp_sorted[:,1])
+    gauss.uz = gauss.linbasis.dot(disp_sorted[:,2])
+    gauss.x_i = '<xx, yy, zz>_i'
+    gauss.u_i = '<ur, ut, uz>_i'
+    gauss.meanstress = gauss.linbasis.dot(meanstress_sorted)
+    gauss.vonmises = gauss.linbasis.dot(vonmises_sorted)
+    gauss.E = gauss.linbasis.dot(E_sorted)
+    gauss.nu = gauss.linbasis.dot(nu_sorted)
+    gauss.sigmarr = gauss.linbasis.dot(sigmarr_sorted)
+    gauss.sigmatt = gauss.linbasis.dot(sigmatt_sorted)
+    gauss.sigmazz = gauss.linbasis.dot(sigmazz_sorted)
+    gauss.sigmart = gauss.linbasis.dot(sigmart_sorted)
+    gauss.sigmarz = gauss.linbasis.dot(sigmarz_sorted)
+    gauss.sigmatz = gauss.linbasis.dot(sigmatz_sorted)
+
+
+    # Plot Stress Results
+    if PLOT3D == True:
+        name = "pressurized_cylinder_model_problem"
+        tri = GaussTri(omega_topo, gauss_degree)
+        export.vtk( name ,tri, x, E=E, nu=nu, u=disp, sigmarr=sigmarr, sigmatt=sigmatt, sigmazz=sigmazz, meanstress=meanstress, vonmises=vonmises )
+
+
+    # Define slice
+    ns = function.Namespace()
+    topo, ns.t = mesh.rectilinear([np.linspace(ri,ro,nSamples+1)])
+    ns.rgeom_i = '< t_0 / sqrt(2), t_0 / sqrt(2), 0 >_i'
+    ns.r = 't_0'
+
+    # sample
+    samplepts = topo.sample('gauss',1)
+    pltpts = locatesample(samplepts, ns.rgeom, gauss_topo, gauss.x, 10000000000)
+    r = samplepts.eval(ns.r)
+    vonmises = pltpts.eval(gauss.vonmises)
+    meanstress = pltpts.eval(gauss.meanstress)
+    ur = pltpts.eval(gauss.u[0])
+    ut = pltpts.eval(gauss.u[1])
+    uz = pltpts.eval(gauss.u[2])
+    E = pltpts.eval(gauss.E)
+    nu = pltpts.eval(gauss.nu)
+    sigmarr = pltpts.eval(gauss.sigmarr)
+    sigmatt = pltpts.eval(gauss.sigmatt)
+    sigmazz = pltpts.eval(gauss.sigmazz)
+    sigmart = pltpts.eval(gauss.sigmart)
+    sigmarz = pltpts.eval(gauss.sigmarz)
+    sigmatz = pltpts.eval(gauss.sigmatz)
+
+    vals = {}
+    vals["vonmises"] = vonmises
+    vals["meanstress"] = meanstress
+    vals["ur"] = ur
+    vals["ut"] = ut
+    vals["uz"] = uz
+    vals["sigmarr"] = sigmarr
+    vals["sigmatt"] = sigmatt
+    vals["sigmazz"] = sigmazz
+    vals["sigmart"] = sigmart
+    vals["sigmarz"] = sigmarz
+    vals["sigmatz"] = sigmatz
+
+    print("finished case: " + label)
+
+
+    return r, vals, residuals
+
 
 def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples):
 
@@ -229,11 +423,15 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree = 2*basis_degree)
     cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
 
+    # Initialize Residual Vector
+    residuals = []
+    def AddResiualNorm(res):
+        residuals.append(res)
+
     # Solve
-    lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='cg', linatol=1e-7, linprecon='diag')
+    lhs = Solve(K-F, cons, AddResiualNorm)    
     #lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='fgmres', linatol=1e-7, linprecon='diag')
     #lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='fgmres', linatol=1e-7)
-
     #lhs = solver.solve_linear('lhs', K-F, constrain = cons)
 
     samplepts = omega_topo.sample('gauss', gauss_degree)
@@ -356,7 +554,7 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
 
     print("finished case: " + label)
 
-    return r, vals
+    return r, vals, residuals
 
 
 
@@ -401,6 +599,7 @@ def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
     vals["sigmarz"] = np.zeros([nSamples])
     vals["sigmatz"] = np.zeros([nSamples])
 
+
     return r, vals
 
 def InitializePlots(keys):
@@ -410,6 +609,26 @@ def InitializePlots(keys):
         figs[key] = plt.figure()
         axs[key] = figs[key].add_subplot(111)
     return figs, axs
+
+def PlotResidual(res, model_problem_name, study_name, label):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    niter = np.arange(0,len(res),1)
+    ax.plot(niter, res, label=label)
+    ax.set_title('Iterative Solver Residual')
+    ax.set_xlabel('k')
+    ax.set_ylabel('|| K $x_{k}$ - F ||')
+    ax.set_yscale('log')
+    ax.legend()
+    fdir = "Results/" + model_problem_name + "/" + study_name + "/Residuals" 
+    if not os.path.exists(fdir):
+        os.makedirs(fdir)
+    fname = label
+    fext = ".png"
+    fpath = fdir + "/" + fname + fext
+    fig.savefig(fpath)
+    print("saved /heartflow/" + fpath)
+    plt.close(fig)
 
 def Plot(axs, r, vals, label):
     for key in axs.keys():
@@ -434,23 +653,24 @@ def Export(model_problem_name, study_name, figs, axs, titles, ylabels):
 
 def CloseFigs(figs):
     for key in figs:
-        plt.close(figs[key])
+        plt.close( figs[key] )
 
 def Normalize(normalization_factors, vals):
     for key in normalization_factors:
-        vals[key] /= normalization_factors[key]
+        if key in vals:
+            vals[key] /= normalization_factors[key]
     return vals
 
-def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+
+def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples, model_problem_name):
 
     # study name
-    study_name = "mesh_resolution_" + BC_TYPE 
+    study_name = "boundary_fitted" 
 
     # Study Arrays
-    nCases = len(Nx)
+    nCases = len(Nr)
 
     # initialize plots
-    keys = ["vonmises", "meanstress", "ur", "ut", "uz", "sigmarr", "sigmatt", "sigmazz", "sigmart", "sigmarz", "sigmatz"]
     titles = {}
     titles["vonmises"] = "Von Mises Stress"
     titles["meanstress"] = "Mean Stress"
@@ -475,14 +695,15 @@ def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     ylabels["sigmart"] = "$\sigma_{r\\theta}$"
     ylabels["sigmarz"] = "$\sigma_{rz}$"
     ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
-    figs, axs = InitializePlots(keys)
+    figs, axs = InitializePlots(titles.keys())
+
 
     # exact solution
     r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
 
     # normalization factors
     max_vals = {}
-    for key in keys:
+    for key in vals_exact:
         max_val = np.max(np.abs(vals_exact[key]))
         max_vals[key] = 1 if max_val == 0 else max_val
 
@@ -498,16 +719,93 @@ def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L, Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
-        # Normalize
+        r, vals, res = BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)        # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
+
 
     # export plots
     Export(model_problem_name, study_name, figs, axs, titles, ylabels)
 
-    # close figs
+    # Close figs
+    CloseFigs(figs)
+
+    print("finished study: " + study_name)
+
+
+def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+
+    # study name
+    study_name = "mesh_resolution_" + BC_TYPE 
+
+    # Study Arrays
+    nCases = len(Nx)
+
+    # initialize plots
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmazz"] = "Axial Stress"
+    titles["sigmart"] = "$ r - \\theta $ Shear Stress"
+    titles["sigmarz"] = "r - z Shear Stress"
+    titles["sigmatz"] = "$ \\theta $ - z Shear Stress"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / \sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / \sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / \sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / \sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / \sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
+    figs, axs = InitializePlots(titles.keys())
+
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in vals_exact:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = str(Nx[i]) + " X " + str(Ny[i]) + " X " + str(1) + " elements"
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals, res = Run(L, Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        # Normalize
+        vals = Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
+
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
+
+    # Close figs
     CloseFigs(figs)
 
     print("finished study: " + study_name)
@@ -560,13 +858,15 @@ def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
         # label
         label = "$ \nu_{wall} $ = " + str(nu_wall[i])
         # 3D Plot
-        PLOT3D = i == nCases - 1
+        PLOT3D = (i == (nCases - 1))
         # Run
-        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs, titles, ylabels)
@@ -637,11 +937,13 @@ def DomainPaddingStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L[i], Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L[i], Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs, titles, ylabels)
@@ -711,11 +1013,13 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs, titles, ylabels)
@@ -784,11 +1088,13 @@ def QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs, titles, ylabels)
@@ -856,11 +1162,13 @@ def BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, 
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree[i], gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree[i], gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs, titles, ylabels)
@@ -928,11 +1236,13 @@ def ImmersedBoundaryResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, 
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L, Nx, Ny, Nu[i], Nv[i], nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu[i], Nv[i], nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
 
     # export plots
     Export(model_problem_name, study_name, figs, axs, titles, ylabels)
@@ -995,10 +1305,14 @@ def main():
     # Run studies
 
     # Mesh Resolution Study
-    N = [50, 100, 150]
+    N = [100]
     MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
+    Nr = [50]
+    Nt = [200]
+    BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, nSamples, model_problem_name)
+    '''
     # Compressibility Study
     poisson_ratios = [0.3, 0.4, 0.45, 0.49]
     CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
@@ -1030,7 +1344,7 @@ def main():
     nv_elems = [10, 50, 100]
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-
+    '''
 
 if __name__ == '__main__':
 	cli.run(main)
