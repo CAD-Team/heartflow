@@ -160,7 +160,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
     omega.du_i = 'Qinv_ij u_j'
     
     # Stiffness Matrix
-    K = omega_topo.integral('ubasis_ni,j stress_ij d:x' @ omega, degree = gauss_degree)
+    K = omega_topo.integral('ubasis_ni,j stress_ij d:x' @ omega, degree=gauss_degree)
 
     # Force Vector
     F = omega_topo.boundary['bottom'].integral('traction_i ubasis_ni d:x' @ omega, degree=gauss_degree)
@@ -1312,14 +1312,14 @@ def main():
     # Run studies
 
     # Mesh Resolution Study
-    N = [100]
-    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
+    N = [50, 100, 150]
+    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
+    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
-    Nr = [20 ,40, 80]
-    Nt = [40, 80, 160]
-    BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, nSamples, model_problem_name)
-    '''
+    Nr = [20, 40]
+    Nt = [40, 80]
+    BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, 5, nSamples, model_problem_name)
+
     # Compressibility Study
     poisson_ratios = [0.3, 0.4, 0.45, 0.49]
     CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
@@ -1331,7 +1331,7 @@ def main():
     BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, "N", nSamples, model_problem_name)
 
     # Quadrature Rule Study
-    pgauss = [2,3]
+    pgauss = [3,4]
     QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "D", nSamples, model_problem_name)
     QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "N", nSamples, model_problem_name)
 
@@ -1351,7 +1351,7 @@ def main():
     nv_elems = [10, 50, 100]
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-    '''
+
 
 if __name__ == '__main__':
 	cli.run(main)
