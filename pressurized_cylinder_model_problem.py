@@ -262,14 +262,14 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
 
     # Define slice
     ns = function.Namespace()
-    eps = (ro - ri) / Nr
+    eps = (ro - ri) / (2 * Nr)
     topo, ns.t = mesh.rectilinear([np.linspace(ri+eps,ro-eps,nSamples+1)])
     ns.rgeom_i = '< t_0 / sqrt(2), t_0 / sqrt(2), 0 >_i'
     ns.r = 't_0'
 
     # sample
     samplepts = topo.sample('gauss',1)
-    pltpts = locatesample(samplepts, ns.rgeom, gauss_topo, gauss.x, 10000000000)
+    pltpts = locatesample(samplepts, ns.rgeom, gauss_topo, gauss.x, 1e-7)
     r = samplepts.eval(ns.r)
     vonmises = pltpts.eval(gauss.vonmises)
     meanstress = pltpts.eval(gauss.meanstress)
@@ -578,12 +578,17 @@ def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
     s.E = E_wall
     s.sigmatt = '((pi ri^2 - po ro^2) / (ro^2 - ri^2)) + ((pi - po) ri^2 ro^2) / (r^2 (ro^2 - ri^2))'
     s.sigmarr = '((pi ri^2 - po ro^2) / (ro^2 - ri^2)) - ((pi - po) ri^2 ro^2) / (r^2 (ro^2 - ri^2))'
-    s.sigmazz = '(pi ri^2 - po ro^2) / (ro^2 - ri^2)'
+    s.sigmazz = '2 nu (pi ri^2 - po ro^2) / (ro^2 - ri^2)'
     s.meanstress = '( sigmatt + sigmarr + sigmazz ) / 3'
     s.vonmises = 'sqrt(  ( (sigmarr - sigmatt)^2 + (sigmatt - sigmazz)^2 + (sigmazz - sigmarr)^2  ) / 2  )'
     s.C1 = '(1 - nu) ((ri^2 pi) / (ro^2 - ri^2)) / E'
     s.C2 = '(1 + nu) ((ri^2 ro^2 pi) / (ro^2 - ri^2)) / E'
-    s.ur = 'C1 r + ( C2 / r )'
+    s.A = '-E C2 / (1 + nu)'
+    s.C = 'E C1 / (2 (1 + nu) (1 - 2 nu))'
+    #s.ur = 'C1 r + ( C2 / r )'
+    s.c2 = '(pi ri^2 - po ro^2) / ( 2 (ro^2 - ri^2) )'
+    s.c3 = '(ri^2 ro^2 (po - pi)) / ( ro^2 - ri^2 )'
+    s.ur = '( 2 c2 (1 - nu) r - (c3 (1 + nu)) / r ) / E'
 
     # Sample Exact Solutions
     vals = {}
@@ -1311,8 +1316,8 @@ def main():
     #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
-    Nr = [20, 200]
-    Nt = [40, 400]
+    Nr = [20 ,40, 80]
+    Nt = [40, 80, 160]
     BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, nSamples, model_problem_name)
     '''
     # Compressibility Study
