@@ -105,327 +105,42 @@ def GaussSort(x, topo, n):
                 nid = nID(i, j, k, nez, ney, n)
                 y[ind] = x[nid]
                 ind = ind + 1
+    print(y)
     return y
 
 def Solve(res, cons, callback):
     return solver.solve_linear('lhs', residual=res, constrain=cons, linsolver='cg', linatol=1e-14, linprecon='diag', lincallback=callback)
 
 
-def FindSpan(p, m, U, u):
-    low = p - 1
-    high = m - p
-    if u == U[high]:
-        return high - 1
-    mid = (low + high) // 2
-    while u < U[mid] or u >= U[mid+1]:
-        if u < U[mid]:
-            high = mid
-        else:
-            low = mid
-        mid = (low + high) // 2
-    return mid
+def RefineTopo3D(topo, geom, ri, ro, nrefine):
+    refined_topo = topo
+    for n in range(nrefine):
+        elems_to_refine = []
+        k = 0
+        bboxsample = refined_topo.sample(*element.parse_legacy_ischeme('vertex'))
+        bboxes = bboxsample.eval(geom)
+        bboxes = bboxes.reshape( [int(len(bboxes)/8), 8, 3] )
+        for i in range(len(bboxes)):
+            if isCut3D(bboxes[i], ri) or isCut3D(bboxes[i], ro):
+                elems_to_refine.append(k)
+            k = k + 1
+        refined_topo = refined_topo.refined_by(refined_topo.transforms[np.array(elems_to_refine)])
+    return refined_topo
 
-def Refine(p, m, U, P, r, X, a, b):
-    if r < 1:
-        return U,P
-
-    n = m - p 
-    V = [0.0]*(m + r)
-    Q = np.zeros([n+r+1,3])
-    r = r - 1
-
-    for j in range(0, a-p+2):
-        Q[j,:] = P[j,:]
-    for j in range(b, n+1):
-        Q[j+r+1,:] = P[j,:]
-    for j in range(0, a+1):
-        V[j] = U[j]
-    for j in range(b+p, m):
-        V[j+r+1] = U[j]
-    i = b + p - 1
-    k = b + p + r
-
-    for j in range(r, -1, -1):
-        while X[j] <= U[i] and i > a:
-            Q[k-p,:] = P[i-p, :]
-            V[k] = U[i]
-            k = k - 1
-            i = i - 1
-        Q[k-p, :] = Q[k - p + 1, :]
-        for l in range(1,p+1):
-            ind = k - p + l
-            alfa = V[k+l] - X[j]
-            if np.abs(alfa) == 0.0:
-                Q[ind, :] = Q[ind+1,:]
-            else:
-                alfa = alfa / (V[k+l]-U[i-p+l])
-                Q[ind, :] = alfa * Q[ind, :] + (1.0 - alfa) * Q[ind + 1, :]
-        V[k] = X[j]
-        k = k - 1
-    return V, Q
+def isCut3D(bbox, r):
+    sign1 = (bbox[0][0])**2 + (bbox[0][1])**2 - r**2
+    sign2 = (bbox[1][0])**2 + (bbox[1][1])**2 - r**2
+    sign3 = (bbox[2][0])**2 + (bbox[2][1])**2 - r**2
+    sign4 = (bbox[3][0])**2 + (bbox[3][1])**2 - r**2
+    sign5 = (bbox[4][0])**2 + (bbox[4][1])**2 - r**2
+    sign6 = (bbox[5][0])**2 + (bbox[5][1])**2 - r**2
+    sign7 = (bbox[6][0])**2 + (bbox[6][1])**2 - r**2
+    sign8 = (bbox[7][0])**2 + (bbox[7][1])**2 - r**2
+    signs = np.sign([sign1, sign2, sign3, sign4, sign5, sign6, sign7, sign8])
+    return any(sign != signs[0] for sign in signs)
 
 
-
-def NURBBSCylinder(ri, ro, t, nr, nt, nz):
-    p = 2
-    U =[0,0,1,1]
-    Pw = np.ndarray([3,3])
-    Pw[0,:] = [1,0,1]
-    Pw[1,:] = [1/np.sqrt(2),1/np.sqrt(2),1/np.sqrt(2)]
-    Pw[2,:] = [0,1,1]
-    u = np.linspace(0,1,nt+1)
-    X = u[1:len(u)-1]
-    a = FindSpan(p, len(U), U, X[0])
-    b = FindSpan(p, len(U), U, X[-1]) + 1
-    V, Qw = Refine(p, len(U), U, Pw, len(X), X, a, b)
-    Q = Qw.copy()
-    for i in range(len(Qw)):
-        Q[i,0:2] /= Qw[i,2]
-    npr = 2 + nr
-    npt = 2 + nt
-    npz = 2 + nz
-    R = np.linspace(ri,ro,npr)
-    Z = np.linspace(-t,t,npz)
-    P = np.zeros([npz * npr * npt, 3])
-    weights = np.zeros([npz * npr * npt])
-    ind = 0
-    for i in range(npt):
-        for j in range(npr):
-            for k in range(npz):
-                P[ind ,:] = [R[j] * Q[i,0], R[j] * Q[i,1], Z[k]]
-                weights[ind] = Q[i,2]
-                ind = ind + 1
-    return P, weights
-
-
-
-def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples):
-
-
-    Navg = (Nr + Nt)/2
-    t = (ro - ri) / (2 * Navg)
-
-    Nz = 1
-
-    P, weights = NURBBSCylinder(ri, ro, t, Nr, Nt, Nz)
-
-    th = np.linspace(0, np.pi/2, Nt + 1)
-    r = np.linspace(ri,ro,Nr+1)
-    z = np.linspace(-t,t,Nz+1)
-
-    omega = function.Namespace()
-    omega_topo, omega.uvw = mesh.rectilinear([th,r,z])
-    omega.quadraticbasis = omega_topo.basis('spline',degree=2)
-    omega.weightfunc = omega.quadraticbasis.dot(weights)
-    omega.nurbsbasis = omega.quadraticbasis * weights / omega.weightfunc
-    omega.x = (omega.nurbsbasis[:,np.newaxis]*P).sum(0)
-    
-    omega.pi = pi
-    omega.traction_i = '<pi cos(uvw_0), pi sin(uvw_0) , 0 >_i'
-
-    # Add Mat Props functions to namespace
-    omega.nu = nu_wall
-    omega.E = E_wall
-    omega.mu = 'E / (2 (1 + nu))'
-    omega.lmbda = 'E nu / ( (1 + nu) (1 - 2 nu) )'
-
-    # Define Analysis
-    omega.basis = omega_topo.basis('spline',degree = basis_degree)
-    omega.ubasis = omega.basis.vector(3)
-    omega.u_i = 'ubasis_ni ?lhs_n'
-    omega.X_i = 'x_i + u_i'
-    omega.strain_ij = '(u_i,j + u_j,i) / 2'
-    omega.stress_ij = 'lmbda strain_kk δ_ij + 2 mu strain_ij'
-    omega.meanstress = 'stress_kk / 3'
-    omega.S_ij = 'stress_ij - (stress_kk) δ_ij / 3'
-    omega.vonmises = 'sqrt(3 S_ij S_ij / 2)'
-    omega.disp = 'sqrt(u_i u_i)'
-    omega.r = 'sqrt( x_i x_i )'
-    omega.cos = 'x_0 / r'
-    omega.sin = 'x_1 / r'
-    omega.Qinv_ij = '< < cos , sin , 0 >_j , < -sin , cos , 0 >_j , < 0 , 0 , 1 >_j >_i'
-    omega.sigma_kl = 'stress_ij Qinv_kj Qinv_li '
-    omega.eps_kl = 'strain_ij Qinv_kj Qinv_li '
-    omega.du_i = 'Qinv_ij u_j'
-    
-    # Stiffness Matrix
-    K = omega_topo.integral('ubasis_ni,j stress_ij d:x' @ omega, degree=gauss_degree)
-
-    # Force Vector
-    F = omega_topo.boundary['bottom'].integral('traction_i ubasis_ni d:x' @ omega, degree=gauss_degree)
-
-    # Constrain Omega
-    sqr  = omega_topo.boundary['right'].integral('u_0 u_0 d:x' @ omega, degree=2*basis_degree)
-    sqr += omega_topo.boundary['left'].integral('u_1 u_1 d:x' @ omega, degree=2*basis_degree)
-    sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree=2*basis_degree)
-    cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-15, linprecon='diag')
-
-    # Initialize Residual Vector
-    residuals = []
-    def AddResiualNorm(res):
-        residuals.append(res)
-
-    # Solve
-    lhs = Solve(K-F, cons, AddResiualNorm)
-
-    samplepts = omega_topo.sample('gauss', gauss_degree)
-    x = samplepts.eval(omega.x)
-    E, nu = samplepts.eval([omega.E, omega.nu])
-    meanstress, vonmises, disp = samplepts.eval(['meanstress', 'vonmises', 'du_i'] @ omega, lhs=lhs)
-    sigmarr, sigmatt, sigmazz, sigmart, sigmatz, sigmarz = samplepts.eval(['sigma_00', 'sigma_11','sigma_22', 'sigma_01','sigma_12', 'sigma_02'] @ omega, lhs=lhs)
-    epsrr, epstt, epszz, epsrt, epstz, epsrz = samplepts.eval(['eps_00', 'eps_11','eps_22', 'eps_01','eps_12', 'eps_02'] @ omega, lhs=lhs)
-
-    # Gauss Mesh
-    gauss = function.Namespace()
-    n = int(np.ceil((gauss_degree+1)/2))
-    nx = omega_topo.shape[0] * n
-    ny = omega_topo.shape[1] * n
-    nz = omega_topo.shape[2] * n
-    gx = np.linspace(0,1,nx)
-    gy = np.linspace(0,1,ny)
-    gz = np.linspace(0,1,nz)
-    gauss_topo, gauss.uvw = mesh.rectilinear([gx,gy,gz])
-
-    # copy and sort samples
-    x_sorted = x.copy()
-    meanstress_sorted = meanstress.copy()
-    vonmises_sorted = vonmises.copy()
-    E_sorted = E.copy()
-    nu_sorted = nu.copy()
-    disp_sorted = disp.copy()
-    sigmarr_sorted = sigmarr.copy()
-    sigmatt_sorted = sigmatt.copy()
-    sigmazz_sorted = sigmazz.copy()
-    sigmart_sorted = sigmart.copy()
-    sigmarz_sorted = sigmarz.copy()
-    sigmatz_sorted = sigmatz.copy()
-    epsrr_sorted = epsrr.copy()
-    epstt_sorted = epstt.copy()
-    epszz_sorted = epszz.copy()
-    epsrt_sorted = epsrt.copy()
-    epsrz_sorted = epsrz.copy()
-    epstz_sorted = epstz.copy()
-
-
-    ind = 0
-    for i in range(nx):
-        for j in range(ny):
-            for k in range(nz):
-                nid = nID(i, j, k, omega_topo.shape[2], omega_topo.shape[1], n)
-                x_sorted[ind] = x[nid]
-                meanstress_sorted[ind] = meanstress[nid]
-                vonmises_sorted[ind] = vonmises[nid]
-                E_sorted[ind] = E[nid]
-                nu_sorted[ind] = nu[nid]
-                disp_sorted[ind] = disp[nid]
-                sigmarr_sorted[ind] = sigmarr[nid]
-                sigmatt_sorted[ind] = sigmatt[nid]
-                sigmazz_sorted[ind] = sigmazz[nid]
-                sigmart_sorted[ind] = sigmart[nid]
-                sigmarz_sorted[ind] = sigmarz[nid]
-                sigmatz_sorted[ind] = sigmatz[nid]
-                epsrr_sorted[ind] = epsrr[nid]
-                epstt_sorted[ind] = epstt[nid]
-                epszz_sorted[ind] = epszz[nid]
-                epsrt_sorted[ind] = epsrt[nid]
-                epsrz_sorted[ind] = epsrz[nid]
-                epstz_sorted[ind] = epstz[nid]
-                ind = ind + 1
-
-
-    # create gauss sample interpolants
-    gauss.linbasis = gauss_topo.basis('spline',degree=1)
-    gauss.xx = gauss.linbasis.dot(x_sorted[:,0])
-    gauss.yy = gauss.linbasis.dot(x_sorted[:,1])
-    gauss.zz = gauss.linbasis.dot(x_sorted[:,2])
-    gauss.ur = gauss.linbasis.dot(disp_sorted[:,0])
-    gauss.ut = gauss.linbasis.dot(disp_sorted[:,1])
-    gauss.uz = gauss.linbasis.dot(disp_sorted[:,2])
-    gauss.x_i = '<xx, yy, zz>_i'
-    gauss.u_i = '<ur, ut, uz>_i'
-    gauss.meanstress = gauss.linbasis.dot(meanstress_sorted)
-    gauss.vonmises = gauss.linbasis.dot(vonmises_sorted)
-    gauss.E = gauss.linbasis.dot(E_sorted)
-    gauss.nu = gauss.linbasis.dot(nu_sorted)
-    gauss.sigmarr = gauss.linbasis.dot(sigmarr_sorted)
-    gauss.sigmatt = gauss.linbasis.dot(sigmatt_sorted)
-    gauss.sigmazz = gauss.linbasis.dot(sigmazz_sorted)
-    gauss.sigmart = gauss.linbasis.dot(sigmart_sorted)
-    gauss.sigmarz = gauss.linbasis.dot(sigmarz_sorted)
-    gauss.sigmatz = gauss.linbasis.dot(sigmatz_sorted)
-    gauss.epsrr = gauss.linbasis.dot(epsrr_sorted)
-    gauss.epstt = gauss.linbasis.dot(epstt_sorted)
-    gauss.epszz = gauss.linbasis.dot(epszz_sorted)
-    gauss.epsrt = gauss.linbasis.dot(epsrt_sorted)
-    gauss.epsrz = gauss.linbasis.dot(epsrz_sorted)
-    gauss.epstz = gauss.linbasis.dot(epstz_sorted)
-
-
-    # Plot Stress Results
-    if PLOT3D == True:
-        name = "pressurized_cylinder_model_problem"
-        tri = GaussTri(omega_topo, gauss_degree)
-        export.vtk( name ,tri, x, E=E, nu=nu, u=disp, sigmarr=sigmarr, sigmatt=sigmatt, sigmazz=sigmazz, meanstress=meanstress, vonmises=vonmises )
-
-
-    # Define slice
-    ns = function.Namespace()
-    eps = (ro - ri) / (2 * Nr)
-    topo, ns.t = mesh.rectilinear([np.linspace(ri+eps,ro-eps,nSamples+1)])
-    ns.rgeom_i = '< t_0 / sqrt(2), t_0 / sqrt(2), 0 >_i'
-    ns.r = 't_0'
-
-    # sample
-    samplepts = topo.sample('gauss',1)
-    pltpts = locatesample(samplepts, ns.rgeom, gauss_topo, gauss.x, 1e-7)
-    r = samplepts.eval(ns.r)
-    vonmises = pltpts.eval(gauss.vonmises)
-    meanstress = pltpts.eval(gauss.meanstress)
-    ur = pltpts.eval(gauss.u[0])
-    ut = pltpts.eval(gauss.u[1])
-    uz = pltpts.eval(gauss.u[2])
-    E = pltpts.eval(gauss.E)
-    nu = pltpts.eval(gauss.nu)
-    sigmarr = pltpts.eval(gauss.sigmarr)
-    sigmatt = pltpts.eval(gauss.sigmatt)
-    sigmazz = pltpts.eval(gauss.sigmazz)
-    sigmart = pltpts.eval(gauss.sigmart)
-    sigmarz = pltpts.eval(gauss.sigmarz)
-    sigmatz = pltpts.eval(gauss.sigmatz)
-    epsrr = pltpts.eval(gauss.epsrr)
-    epstt = pltpts.eval(gauss.epstt)
-    epszz = pltpts.eval(gauss.epszz)
-    epsrt = pltpts.eval(gauss.epsrt)
-    epsrz = pltpts.eval(gauss.epsrz)
-    epstz = pltpts.eval(gauss.epstz)
-
-
-    vals = {}
-    vals["vonmises"] = vonmises
-    vals["meanstress"] = meanstress
-    vals["ur"] = ur
-    vals["ut"] = ut
-    vals["uz"] = uz
-    vals["sigmarr"] = sigmarr
-    vals["sigmatt"] = sigmatt
-    vals["sigmazz"] = sigmazz
-    vals["sigmart"] = sigmart
-    vals["sigmarz"] = sigmarz
-    vals["sigmatz"] = sigmatz
-    vals["epsrr"] = epsrr
-    vals["epstt"] = epstt
-    vals["epszz"] = epszz
-    vals["epsrt"] = epsrt
-    vals["epsrz"] = epsrz
-    vals["epstz"] = epstz
-
-    print("finished case: " + label)
-
-
-    return r, vals, residuals
-
-
-def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples):
+def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, PLOT3D, label, nSamples):
 
     # mat prop functions
     class PoissonRatio(function.Pointwise):
@@ -526,11 +241,13 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     omega.sin = 'x_1 / r'
     omega.Qinv_ij = '< < cos , sin , 0 >_j , < -sin , cos , 0 >_j , < 0 , 0 , 1 >_j >_i'
     omega.sigma_kl = 'stress_ij Qinv_kj Qinv_li '
-    omega.eps_kl =  'strain_ij Qinv_kj Qinv_li '
     omega.du_i = 'Qinv_ij u_j'
+    omega.eps_kl =  'strain_ij Qinv_kj Qinv_li '
     
     # Stiffness Matrix
-    K = omega_topo.integral('ubasis_ni,j stress_ij d:x' @ omega, degree = gauss_degree)
+    refined_omega_topo = RefineTopo3D(omega_topo, omega.x, ri, ro, nrefine)
+    gauss_sample = refined_omega_topo.sample('gauss', gauss_degree)
+    K = gauss_sample.integral('ubasis_ni,j stress_ij d:x' @ omega)
 
     # Force Vector
     F = sample_trimmed_omega.integral('traction_i Jgamma ubasis_ni' @ omega)
@@ -557,104 +274,16 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     #lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='fgmres', linatol=1e-7)
     #lhs = solver.solve_linear('lhs', K-F, constrain = cons)
 
-    samplepts = omega_topo.sample('gauss', gauss_degree)
+    samplepts = refined_omega_topo.sample('bezier', 2)
     x = samplepts.eval(omega.x)
     E, nu = samplepts.eval([omega.E, omega.nu])
     meanstress, vonmises, disp = samplepts.eval(['meanstress', 'vonmises', 'du_i'] @ omega, lhs=lhs)
     sigmarr, sigmatt, sigmazz, sigmart, sigmatz, sigmarz = samplepts.eval(['sigma_00', 'sigma_11','sigma_22', 'sigma_01','sigma_12', 'sigma_02'] @ omega, lhs=lhs)
-    epsrr, epstt, epszz, epsrt, epstz, epsrz = samplepts.eval(['eps_00', 'eps_11','eps_22', 'eps_01','eps_12', 'eps_02'] @ omega, lhs=lhs)
-
-    # Gauss Mesh
-    gauss = function.Namespace()
-    n = int(np.ceil((gauss_degree+1)/2))
-    nx = omega_topo.shape[0] * n
-    ny = omega_topo.shape[1] * n
-    nz = omega_topo.shape[2] * n
-    gx = np.linspace(0,1,nx)
-    gy = np.linspace(0,1,ny)
-    gz = np.linspace(0,1,nz)
-    gauss_topo, gauss.uvw = mesh.rectilinear([gx,gy,gz])
-
-    # copy and sort samples
-    x_sorted = x.copy()
-    meanstress_sorted = meanstress.copy()
-    vonmises_sorted = vonmises.copy()
-    E_sorted = E.copy()
-    nu_sorted = nu.copy()
-    disp_sorted = disp.copy()
-    sigmarr_sorted = sigmarr.copy()
-    sigmatt_sorted = sigmatt.copy()
-    sigmazz_sorted = sigmazz.copy()
-    sigmart_sorted = sigmart.copy()
-    sigmarz_sorted = sigmarz.copy()
-    sigmatz_sorted = sigmatz.copy()
-    epsrr_sorted = epsrr.copy()
-    epstt_sorted = epstt.copy()
-    epszz_sorted = epszz.copy()
-    epsrt_sorted = epsrt.copy()
-    epsrz_sorted = epsrz.copy()
-    epstz_sorted = epstz.copy()
-
-
-    ind = 0
-    for i in range(nx):
-        for j in range(ny):
-            for k in range(nz):
-                nid = nID(i, j, k, omega_topo.shape[2], omega_topo.shape[1], n)
-                x_sorted[ind] = x[nid]
-                meanstress_sorted[ind] = meanstress[nid]
-                vonmises_sorted[ind] = vonmises[nid]
-                E_sorted[ind] = E[nid]
-                nu_sorted[ind] = nu[nid]
-                disp_sorted[ind] = disp[nid]
-                sigmarr_sorted[ind] = sigmarr[nid]
-                sigmatt_sorted[ind] = sigmatt[nid]
-                sigmazz_sorted[ind] = sigmazz[nid]
-                sigmart_sorted[ind] = sigmart[nid]
-                sigmarz_sorted[ind] = sigmarz[nid]
-                sigmatz_sorted[ind] = sigmatz[nid]
-                epsrr_sorted[ind] = epsrr[nid]
-                epstt_sorted[ind] = epstt[nid]
-                epszz_sorted[ind] = epszz[nid]
-                epsrt_sorted[ind] = epsrt[nid]
-                epsrz_sorted[ind] = epsrz[nid]
-                epstz_sorted[ind] = epstz[nid]
-                ind = ind + 1
-
-
-    # create gauss sample interpolants
-    gauss.linbasis = gauss_topo.basis('spline',degree=1)
-    gauss.xx = gauss.linbasis.dot(x_sorted[:,0])
-    gauss.yy = gauss.linbasis.dot(x_sorted[:,1])
-    gauss.zz = gauss.linbasis.dot(x_sorted[:,2])
-    gauss.ur = gauss.linbasis.dot(disp_sorted[:,0])
-    gauss.ut = gauss.linbasis.dot(disp_sorted[:,1])
-    gauss.uz = gauss.linbasis.dot(disp_sorted[:,2])
-    gauss.x_i = '<xx, yy, zz>_i'
-    gauss.u_i = '<ur, ut, uz>_i'
-    gauss.meanstress = gauss.linbasis.dot(meanstress_sorted)
-    gauss.vonmises = gauss.linbasis.dot(vonmises_sorted)
-    gauss.E = gauss.linbasis.dot(E_sorted)
-    gauss.nu = gauss.linbasis.dot(nu_sorted)
-    gauss.sigmarr = gauss.linbasis.dot(sigmarr_sorted)
-    gauss.sigmatt = gauss.linbasis.dot(sigmatt_sorted)
-    gauss.sigmazz = gauss.linbasis.dot(sigmazz_sorted)
-    gauss.sigmart = gauss.linbasis.dot(sigmart_sorted)
-    gauss.sigmarz = gauss.linbasis.dot(sigmarz_sorted)
-    gauss.sigmatz = gauss.linbasis.dot(sigmatz_sorted)
-    gauss.epsrr = gauss.linbasis.dot(epsrr_sorted)
-    gauss.epstt = gauss.linbasis.dot(epstt_sorted)
-    gauss.epszz = gauss.linbasis.dot(epszz_sorted)
-    gauss.epsrt = gauss.linbasis.dot(epsrt_sorted)
-    gauss.epsrz = gauss.linbasis.dot(epsrz_sorted)
-    gauss.epstz = gauss.linbasis.dot(epstz_sorted)
-
 
     # Plot Stress Results
     if PLOT3D == True:
         name = "pressurized_cylinder_model_problem"
-        tri = GaussTri(omega_topo, gauss_degree)
-        export.vtk( name ,tri, x, E=E, nu=nu, u=disp, sigmarr=sigmarr, sigmatt=sigmatt, sigmazz=sigmazz, meanstress=meanstress, vonmises=vonmises )
+        export.vtk( name ,samplepts.tri, x, E=E, nu=nu, u=disp, sigmarr=sigmarr, sigmatt=sigmatt, sigmazz=sigmazz, meanstress=meanstress, vonmises=vonmises)
 
 
     # Define slice
@@ -665,27 +294,27 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
 
     # sample
     samplepts = topo.sample('gauss',1)
-    pltpts = locatesample(samplepts, ns.rgeom, gauss_topo, gauss.x, 10000000000)
+    pltpts = locatesample(samplepts, ns.rgeom, omega_topo, omega.x, 10000000000)
     r = samplepts.eval(ns.r)
-    vonmises = pltpts.eval(gauss.vonmises)
-    meanstress = pltpts.eval(gauss.meanstress)
-    ur = pltpts.eval(gauss.u[0])
-    ut = pltpts.eval(gauss.u[1])
-    uz = pltpts.eval(gauss.u[2])
-    E = pltpts.eval(gauss.E)
-    nu = pltpts.eval(gauss.nu)
-    sigmarr = pltpts.eval(gauss.sigmarr)
-    sigmatt = pltpts.eval(gauss.sigmatt)
-    sigmazz = pltpts.eval(gauss.sigmazz)
-    sigmart = pltpts.eval(gauss.sigmart)
-    sigmarz = pltpts.eval(gauss.sigmarz)
-    sigmatz = pltpts.eval(gauss.sigmatz)
-    epsrr = pltpts.eval(gauss.epsrr)
-    epstt = pltpts.eval(gauss.epstt)
-    epszz = pltpts.eval(gauss.epszz)
-    epsrt = pltpts.eval(gauss.epsrt)
-    epsrz = pltpts.eval(gauss.epsrz)
-    epstz = pltpts.eval(gauss.epstz)
+    vonmises = pltpts.eval(omega.vonmises, lhs=lhs)
+    meanstress = pltpts.eval(omega.meanstress, lhs=lhs)
+    ur = pltpts.eval(omega.du[0], lhs=lhs)
+    ut = pltpts.eval(omega.du[1], lhs=lhs)
+    uz = pltpts.eval(omega.du[2], lhs=lhs)
+    E = pltpts.eval(omega.E)
+    nu = pltpts.eval(omega.nu)
+    sigmarr = pltpts.eval('sigma_00' @ omega, lhs=lhs)
+    sigmatt = pltpts.eval('sigma_11' @ omega, lhs=lhs)
+    sigmazz = pltpts.eval('sigma_22' @ omega, lhs=lhs)
+    sigmart = pltpts.eval('sigma_01' @ omega, lhs=lhs)
+    sigmarz = pltpts.eval('sigma_02' @ omega, lhs=lhs)
+    sigmatz = pltpts.eval('sigma_12' @ omega, lhs=lhs)
+    epsrr = pltpts.eval('eps_00' @ omega, lhs=lhs)
+    epstt = pltpts.eval('eps_11' @ omega, lhs=lhs)
+    epszz = pltpts.eval('eps_22' @ omega, lhs=lhs)
+    epsrt = pltpts.eval('eps_01' @ omega, lhs=lhs)
+    epsrz = pltpts.eval('eps_02' @ omega, lhs=lhs)
+    epstz = pltpts.eval('eps_12' @ omega, lhs=lhs)
 
     vals = {}
     vals["vonmises"] = vonmises
@@ -762,6 +391,7 @@ def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
     vals["epsrz"] = np.zeros([nSamples])
     vals["epstz"] = np.zeros([nSamples])
 
+
     return r, vals
 
 def InitializePlots(keys):
@@ -825,7 +455,7 @@ def Normalize(normalization_factors, vals):
     return vals
 
 
-def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "mesh_resolution_" + BC_TYPE 
@@ -894,7 +524,7 @@ def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals, res = Run(L, Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -911,7 +541,94 @@ def MeshResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
 
     print("finished study: " + study_name)
 
-def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+def QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
+
+    # study name
+    study_name = "quadrature_refinement_" + BC_TYPE 
+
+    # Study Arrays
+    nCases = len(nrefine)
+
+    # initialize plots
+    titles = {}
+    titles["vonmises"] = "Von Mises Stress"
+    titles["meanstress"] = "Mean Stress"
+    titles["ur"] = "Radial Displacement"
+    titles["ut"] = "Circumfrencial Displacement"
+    titles["uz"] = "Axial Displacement"
+    titles["sigmarr"] = "Radial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmazz"] = "Axial Stress"
+    titles["sigmart"] = "$ r - \\theta $ Shear Stress"
+    titles["sigmarz"] = "r - z Shear Stress"
+    titles["sigmatz"] = "$ \\theta $ - z Shear Stress"
+    titles["epsrr"] = "Radial Strain"
+    titles["epstt"] = "Hoop Strain"
+    titles["epszz"] = "Axial Strain"
+    titles["epsrt"] = "$ r - \\theta $ Shear Strain"
+    titles["epsrz"] = "r - z Shear Strain"
+    titles["epstz"] = "$ \\theta $ - z Shear Strain"
+    ylabels = {}
+    ylabels["vonmises"] = "$\sigma_{vm} / \sigma_{0}$"
+    ylabels["meanstress"] = "$\sigma_{mean} / \sigma_{0}$"
+    ylabels["ur"] = "$u_{r} / u_{0}$"
+    ylabels["ut"] = "$u_{\\theta}$"
+    ylabels["uz"] = "$u_{z}$"
+    ylabels["sigmarr"] = "$\sigma_{rr} / \sigma_{0}$"
+    ylabels["sigmatt"] = "$\sigma_{\\theta \\theta} / \sigma_{0}$"
+    ylabels["sigmazz"] = "$\sigma_{zz} / \sigma_{0}$"
+    ylabels["sigmart"] = "$\sigma_{r\\theta}$"
+    ylabels["sigmarz"] = "$\sigma_{rz}$"
+    ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
+    ylabels["epsrr"] = "$\epsilon_{rr} / \epsilon_{0}$"
+    ylabels["epstt"] = "$\epsilon_{\\theta \\theta}"
+    ylabels["epszz"] = "$\epsilon_{zz}"
+    ylabels["epsrt"] = "$\epsilon_{r\\theta}$"
+    ylabels["epsrz"] = "$\epsilon_{rz}$"
+    ylabels["epstz"] = "$\epsilon_{\\theta z}$"
+    figs, axs = InitializePlots(titles.keys())
+
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+
+    # normalization factors
+    max_vals = {}
+    for key in vals_exact:
+        max_val = np.max(np.abs(vals_exact[key]))
+        max_vals[key] = 1 if max_val == 0 else max_val
+
+    # Normalize
+    vals_exact = Normalize(max_vals, vals_exact)
+    # Plot Exact Solution
+    Plot(axs, r_exact, vals_exact, 'exact')
+
+    # loop cases
+    for i in range(nCases):
+        # label
+        label = "N = " + str(nrefine[i])
+        # 3D Plot
+        PLOT3D = i == nCases - 1
+        # Run
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine[i], BC_TYPE, PLOT3D, label, nSamples)
+        # Normalize
+        vals = Normalize(max_vals, vals)
+        # Plot numerical solution
+        Plot(axs, r, vals, label)
+        # Plot solution residual
+        PlotResidual(res, model_problem_name, study_name, label)
+
+
+    # export plots
+    Export(model_problem_name, study_name, figs, axs, titles, ylabels)
+
+    # Close figs
+    CloseFigs(figs)
+
+    print("finished study: " + study_name)
+
+
+def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
     # study name
     study_name = "compressibility_" + BC_TYPE 
 
@@ -978,7 +695,7 @@ def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
         # 3D Plot
         PLOT3D = (i == (nCases - 1))
         # Run
-        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -996,9 +713,7 @@ def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
 
 
 
-
-
-def DomainPaddingStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+def DomainPaddingStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "domain_padding_" + BC_TYPE 
@@ -1066,7 +781,7 @@ def DomainPaddingStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals, res = Run(L[i], Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L[i], Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -1085,13 +800,14 @@ def DomainPaddingStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
 
 
 
-def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "air_properties_" + BC_TYPE 
 
     # Study Arrays
     nCases = len(E_air)
+
     # initialize plots
     titles = {}
     titles["vonmises"] = "Von Mises Stress"
@@ -1152,7 +868,7 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air[i], ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air[i], ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -1169,7 +885,7 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
     print("finished study: " + study_name)
 
 
-def QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+def QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "quadrature_rule_" + BC_TYPE 
@@ -1238,7 +954,7 @@ def QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree[i], BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree[i], nrefine, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -1255,7 +971,7 @@ def QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     print("finished study: " + study_name)
 
 
-def BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+def BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "basis_degree_" + BC_TYPE 
@@ -1301,7 +1017,6 @@ def BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, 
     ylabels["epsrz"] = "$\epsilon_{rz}$"
     ylabels["epstz"] = "$\epsilon_{\\theta z}$"
     figs, axs = InitializePlots(titles.keys())
-
     # exact solution
     r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
 
@@ -1323,7 +1038,7 @@ def BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, 
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree[i], gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree[i], gauss_degree, nrefine, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -1340,7 +1055,7 @@ def BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, 
     print("finished study: " + study_name)
 
 
-def ImmersedBoundaryResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, nSamples, model_problem_name):
+def ImmersedBoundaryResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, nSamples, model_problem_name):
 
     # study name
     study_name = "boundary_resolution_" + BC_TYPE 
@@ -1386,6 +1101,7 @@ def ImmersedBoundaryResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, 
     ylabels["epsrz"] = "$\epsilon_{rz}$"
     ylabels["epstz"] = "$\epsilon_{\\theta z}$"
     figs, axs = InitializePlots(titles.keys())
+
     # exact solution
     r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
 
@@ -1407,7 +1123,7 @@ def ImmersedBoundaryResolutionStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, 
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals, res = Run(L, Nx, Ny, Nu[i], Nv[i], nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals, res = Run(L, Nx, Ny, Nu[i], Nv[i], nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -1429,7 +1145,7 @@ def main():
     # DEFINE DEFAULT VALUES
 
     # model problem name
-    model_problem_name = "cylinder"
+    model_problem_name = "adaptive_cylinder"
 
     # outer radius
     ro = 3.2 / 2
@@ -1438,7 +1154,7 @@ def main():
     ri = 1.75 / 2
 
     # inner pressure [mPa]
-    pi = .12 
+    pi = .012 
 
     # cylinder wall properties [mPa]
     nu_wall =  0.3
@@ -1471,6 +1187,9 @@ def main():
     # Boundary condition type: "D" for Dirichlet or "N" for Neumann
     BC_TYPE = "D"
 
+    # nrefine
+    nrefine = 3
+
     ########################################
 
     
@@ -1478,44 +1197,48 @@ def main():
 
     # Mesh Resolution Study
     N = [50, 100, 150]
-    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-    
+    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "D", nSamples, model_problem_name)
+    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
+
+    nref = [3,4,5]
+    QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, "D", nSamples, model_problem_name)
+    QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, "N", nSamples, model_problem_name)
+
     # Compressibility Study
     poisson_ratios = [0.3, 0.4, 0.45, 0.49]
-    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
+    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "D", nSamples, model_problem_name)
+    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
 
     # Basis Degree Study
-    p = [1,2,3]
-    BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, "D", nSamples, model_problem_name)
-    BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, "N", nSamples, model_problem_name)
+    p = [1, 2, 3]
+    BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, nrefine, "D", nSamples, model_problem_name)
+    BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, nrefine, "N", nSamples, model_problem_name)
 
 
     # Quadrature Rule Study
-    pgauss = [3,4]
-    QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "D", nSamples, model_problem_name)
-    QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "N", nSamples, model_problem_name)
+    pgauss = [3, 4]
+    QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, nrefine, "D", nSamples, model_problem_name)
+    QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, nrefine, "N", nSamples, model_problem_name)
 
 
     # Air Properties Study
     Ea = [.1 * E_wall, .001 * E_wall, .00001 * E_wall]
-    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-
+    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nrefine, "D", nSamples, model_problem_name)
+    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
 
 
     # Domain Padding Study
     size = [1.1 *ro, 1.5 *ro, 2.5 *ro]
     N = [int(np.ceil(Nx * 1.1)), int(np.ceil(Nx * 1.5)), int(np.ceil(Nx * 2.5))]
-    DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
+    DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "D", nSamples, model_problem_name)
+    DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
 
     # Immersed Boundary Resolution Study
     nu_elems = [100, 1000, 2000]
     nv_elems = [1, 10, 20]
-    ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-    
+    ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "D", nSamples, model_problem_name)
+    ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
+    '''
+
 if __name__ == '__main__':
 	cli.run(main)
