@@ -1178,8 +1178,8 @@ def main():
     L = 2 * ro
 
     # number voxels
-    Nx = 5
-    Ny = 5
+    Nx = 100
+    Ny = 100
 
     # number of plot sample points
     nSamples = 100
@@ -1198,7 +1198,7 @@ def main():
     # Mesh Resolution Study
     N = [50, 100, 150]
     MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "D", nSamples, model_problem_name)
-    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
+    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
 
     nref = [3,4,5]
     QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, "D", nSamples, model_problem_name)

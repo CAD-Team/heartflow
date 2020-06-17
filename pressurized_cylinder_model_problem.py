@@ -1438,7 +1438,7 @@ def main():
     ri = 1.75 / 2
 
     # inner pressure [mPa]
-    pi = .12 
+    pi = .012 
 
     # cylinder wall properties [mPa]
     nu_wall =  0.3
@@ -1462,8 +1462,8 @@ def main():
     L = 2 * ro
 
     # number voxels
-    Nx = 5
-    Ny = 5
+    Nx = 100
+    Ny = 100
 
     # number of plot sample points
     nSamples = 100
@@ -1479,7 +1479,7 @@ def main():
     # Mesh Resolution Study
     N = [50, 100, 150]
     MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
-    #MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
+    MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
     
     # Compressibility Study
     poisson_ratios = [0.3, 0.4, 0.45, 0.49]
@@ -1502,7 +1502,6 @@ def main():
     Ea = [.1 * E_wall, .001 * E_wall, .00001 * E_wall]
     AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-
 
 
     # Domain Padding Study
