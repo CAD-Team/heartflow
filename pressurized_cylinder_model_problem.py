@@ -109,6 +109,10 @@ def GaussSort(x, topo, n):
     return y
 
 
+def callback(args):
+    print( np.linalg.norm(args) )
+
+
 def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples):
 
     # mat prop functions
@@ -230,7 +234,7 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
 
     # Solve
-    lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='cg', linatol=1e-7, linprecon='diag')
+    lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='cg', linatol=1e-7, linprecon='diag', lincallback=callback)
     #lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='fgmres', linatol=1e-7, linprecon='diag')
     #lhs = solver.solve_linear('lhs', residual=K-F, constrain=cons, linsolver='fgmres', linatol=1e-7)
 
@@ -558,7 +562,7 @@ def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
     # loop cases
     for i in range(nCases):
         # label
-        label = "$ \nu_{wall} $ = " + str(nu_wall[i])
+        label = "$ \\nu_{wall} $ = " + str(nu_wall[i])
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
@@ -711,7 +715,7 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air[i], ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -780,11 +784,11 @@ def QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     for i in range(nCases):
         # label
         n = int(np.ceil((gauss_degree[i]+1)/2))
-        label = "n = " + str(n) + " x " + str(n) + " x " + str(n)
+        label = "n = " + str(n) + " X " + str(n) + " X " + str(n)
         # 3D Plot
         PLOT3D = i == nCases - 1
         # Run
-        r, vals = Run(L[i], N[i], N[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, BC_TYPE, PLOT3D, label, nSamples)
+        r, vals = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree[i], BC_TYPE, PLOT3D, label, nSamples)
         # Normalize
         vals = Normalize(max_vals, vals)
         # Plot numerical solution
@@ -993,12 +997,13 @@ def main():
     ########################################
 
     # Run studies
-
+    
     # Mesh Resolution Study
     N = [50, 100, 150]
     MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     MeshResolutionStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-
+    
+    '''
     # Compressibility Study
     poisson_ratios = [0.3, 0.4, 0.45, 0.49]
     CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
@@ -1008,20 +1013,20 @@ def main():
     p = [1,2,3]
     BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, "D", nSamples, model_problem_name)
     BasisDegreeStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, p, gauss_degree, "N", nSamples, model_problem_name)
-
+    
     # Quadrature Rule Study
-    pgauss = [2,3]
+    pgauss = [3,4]
     QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "D", nSamples, model_problem_name)
     QuadratureRuleStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, pgauss, "N", nSamples, model_problem_name)
-
+    
     # Air Properties Study
     Ea = [.01 * E_wall, .001 * E_wall, .0001 * E_wall]
     AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-
+    
     # Domain Padding Study
     size = [1.1 * ro, 1.5 *ro, 2.5 * ro]
-    N = int(np.ceil([Nx * 1.1, Nx * 1.5, Nx * 2.5]))
+    N = [int(np.ceil(Nx * 1.1)), int(np.ceil(Nx * 1.5)), int(np.ceil(Nx * 2.5))]
     DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     DomainPaddingStudy(size, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
 
@@ -1030,7 +1035,7 @@ def main():
     nv_elems = [10, 50, 100]
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "D", nSamples, model_problem_name)
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, "N", nSamples, model_problem_name)
-
+    '''
 
 if __name__ == '__main__':
 	cli.run(main)
