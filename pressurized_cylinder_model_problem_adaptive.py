@@ -1238,7 +1238,7 @@ def main():
     nv_elems = [1, 10, 20]
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "D", nSamples, model_problem_name)
     ImmersedBoundaryResolutionStudy(L, Nx, Ny, nu_elems, nv_elems, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, "N", nSamples, model_problem_name)
-    '''
+    
 
 if __name__ == '__main__':
 	cli.run(main)

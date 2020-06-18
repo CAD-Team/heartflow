@@ -245,6 +245,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
     omega.sigma_kl = 'stress_ij Qinv_kj Qinv_li '
     omega.eps_kl = 'strain_ij Qinv_kj Qinv_li '
     omega.du_i = 'Qinv_ij u_j'
+    omega.sum = 'nu ( sigma_00 + sigma_11 )'
     
     # Stiffness Matrix
     K = omega_topo.integral('ubasis_ni,j stress_ij d:x' @ omega, degree=gauss_degree)
@@ -273,7 +274,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
     meanstress, vonmises, disp = samplepts.eval(['meanstress', 'vonmises', 'du_i'] @ omega, lhs=lhs)
     sigmarr, sigmatt, sigmazz, sigmart, sigmatz, sigmarz = samplepts.eval(['sigma_00', 'sigma_11','sigma_22', 'sigma_01','sigma_12', 'sigma_02'] @ omega, lhs=lhs)
     epsrr, epstt, epszz, epsrt, epstz, epsrz = samplepts.eval(['eps_00', 'eps_11','eps_22', 'eps_01','eps_12', 'eps_02'] @ omega, lhs=lhs)
-
+    ssum = samplepts.eval(omega.sum, lhs=lhs)
 
     # Gauss Mesh
     gauss = function.Namespace()
@@ -305,6 +306,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
     epsrt_sorted = epsrt.copy()
     epsrz_sorted = epsrz.copy()
     epstz_sorted = epstz.copy()
+    ssum_sorted = ssum.copy()
 
 
     ind = 0
@@ -330,6 +332,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
                 epsrt_sorted[ind] = epsrt[nid]
                 epsrz_sorted[ind] = epsrz[nid]
                 epstz_sorted[ind] = epstz[nid]
+                ssum_sorted[ind] = ssum[nid]
                 ind = ind + 1
 
 
@@ -359,6 +362,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
     gauss.epsrt = gauss.linbasis.dot(epsrt_sorted)
     gauss.epsrz = gauss.linbasis.dot(epsrz_sorted)
     gauss.epstz = gauss.linbasis.dot(epstz_sorted)
+    gauss.sum = gauss.linbasis.dot(ssum_sorted)
 
 
     # Plot Stress Results
@@ -398,6 +402,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
     epsrt = pltpts.eval(gauss.epsrt)
     epsrz = pltpts.eval(gauss.epsrz)
     epstz = pltpts.eval(gauss.epstz)
+    ssum = pltpts.eval(gauss.sum)
 
 
     vals = {}
@@ -418,6 +423,7 @@ def BoundaryFittedSolution(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, ga
     vals["epsrt"] = epsrt
     vals["epsrz"] = epsrz
     vals["epstz"] = epstz
+    vals["sum"] = ssum
 
     print("finished case: " + label)
 
@@ -453,6 +459,7 @@ def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
     s.d2 = '( (1 - 2 nu) pi ) / ro^2'
     s.ur = 'd1 ( (pi / r ) + d2 r )'
     s.epsrr = '(- d1 pi / r^2) + d1 d2'
+    s.sum = "nu ( sigmatt + sigmarr )"
 
 
 
@@ -476,6 +483,7 @@ def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
     vals["epsrt"] = np.zeros([nSamples])
     vals["epsrz"] = np.zeros([nSamples])
     vals["epstz"] = np.zeros([nSamples])
+    vals["sum"] = samplepts.eval(s.sum)
 
 
     return r, vals
@@ -563,6 +571,7 @@ def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis
     titles["sigmarz"] = "r - z Shear Stress"
     titles["sigmatz"] = "$ \\theta $ - z Shear Stress"
     titles["epsrr"] = "Radial Strain"
+    titles["sum"] = "Axial Stress from Sum of Computed Radial and Hoop Stress values"
     ylabels = {}
     ylabels["vonmises"] = "$\sigma_{vm} / \sigma_{0}$"
     ylabels["meanstress"] = "$\sigma_{mean} / \sigma_{0}$"
@@ -576,6 +585,7 @@ def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis
     ylabels["sigmarz"] = "$\sigma_{rz}$"
     ylabels["sigmatz"] = "$\sigma_{\\theta z}$"
     ylabels["epsrr"] = "$\\epsilon_{rr}$"
+    ylabels["sum"] = "$\\nu ( \sigma_{rr} + \sigma_{\\theta \\theta} )$"
     figs, axs = InitializePlots(titles.keys())
 
 
@@ -589,7 +599,7 @@ def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis
         max_vals[key] = 1 if max_val == 0 else max_val
 
     # Normalize
-    vals_exact = Normalize(max_vals, vals_exact)
+    #vals_exact = Normalize(max_vals, vals_exact)
     # Plot Exact Solution
     Plot(axs, r_exact, vals_exact, 'exact')
 
@@ -602,7 +612,7 @@ def BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis
         # Run
         r, vals, res = BoundaryFittedSolution(Nr[i], Nt[i], nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, PLOT3D, label, nSamples)
         # normalize
-        vals = Normalize(max_vals, vals)
+        #vals = Normalize(max_vals, vals)
         # Plot numerical solution
         Plot(axs, r, vals, label)
         # Plot solution residual
@@ -625,7 +635,7 @@ def main():
     # DEFINE DEFAULT VALUES
 
     # model problem name
-    model_problem_name = "cylinder"
+    model_problem_name = "cylinder_bodyfitted_nurbs_not_normalized"
 
     # outer radius
     ro = 3.2 / 2
@@ -644,11 +654,7 @@ def main():
     basis_degree = 2
 
     # quadrature order
-    gauss_degree = 10
-
-    # number voxels
-    Nx = 100
-    Ny = 100
+    gauss_degree = 5
 
     # number of plot sample points
     nSamples = 100
@@ -658,8 +664,8 @@ def main():
 
     
     # Run studies
-    Nr = [20, 40]
-    Nt = [40, 80]
+    Nr = [40, 80]
+    Nt = [80, 160]
     BoundaryFittedMeshResolutionStudy(Nr, Nt, nu_wall, E_wall, ri, ro, pi, basis_degree, gauss_degree, nSamples, model_problem_name)
 
 
