@@ -615,30 +615,24 @@ def CompressibilityStudy2(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri,
     # initialize plots
     stress_fig = plt.figure()
     stress_ax = stress_fig.add_subplot(111)
-    disp_fig = plt.figure()
-    disp_ax = disp_fig.add_subplot(111)
 
     # exact solution
-    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall[0], E_wall, nSamples)
 
     # plot exact solution
     stress_ax.plot(r_exact, vals_exact["sigmatt"], color='black', label="exact")
     stress_ax.plot(r_exact, vals_exact["sigmarr"], color='black')
     stress_ax.plot(r_exact, vals_exact["sigmazz"], color='black')
-    disp_ax.plot(r_exact, vals_exact["ur"], color='black'label="exact")
 
     # Numerical Solution
-    label = "n = " + str(nrefine)
-    r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, False, label, nSamples)
-
     # Plot numerical solution
     for i in range(len(nu_wall)):
         label = "$\\nu = $" + str(nu_wall[i])
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, BC_TYPE, False, label, nSamples)
         line = stress_ax.plot(r_exact, vals["sigmatt"], label=label)
-        col = line.get_color()
+        col = line[-1].get_color()
         stress_ax.plot(r_exact, vals["sigmarr"], color=col)
         stress_ax.plot(r_exact, vals["sigmazz"], color=col)
-        disp_ax.plot(r_exact, vals["ur"], color=col, label=label)
 
     # set axis limits
     #ylim = {}
@@ -654,22 +648,15 @@ def CompressibilityStudy2(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri,
     stress_ax.set_xlabel('r [mm]')
     stress_ax.set_ylabel("[Mpa]")
     stress_ax.legend()
-    disp_ax.set_title("Radial Displacement")
-    disp_ax.set_xlabel('r [mm]')
-    disp_ax.set_ylabel("$u_{r}$ [mm]")
-    disp_ax.legend()
 
     fdir = "Results/" + model_problem_name + "/" + study_name
     if not os.path.exists(fdir):
         os.makedirs(fdir)
     stress_fig.savefig(fdir + "/" + "stress_plots.png")
     print("saved /heartflow/" + fdir + "/" + "stress_plots.png")
-    disp_fig.savefig(fdir + "/" + "radial_disp.png")
-    print("saved /heartflow/" + fdir + "/" + "radial_disp.png")
 
     # Close figs
     plt.close(stress_fig)
-    plt.close(disp_fig)
 
     print("finished study: " + study_name)
 
