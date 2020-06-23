@@ -56,15 +56,16 @@ def RefineBySDF(topo, sdf, nrefine):
         k = 0
         bez = refined_topo.sample('bezier',2)
         sd = bez.eval(sdf)
-        sd = sd.reshape( [int(len(sd)/8), 8] )
+        sd = sd.reshape( [len(sd)//8, 8] )
         for i in range(len(sd)):
-            if any(np.sign(sdval) != np.sign(sd[i][0]) for sdval in sd[i,:])
+            if any(np.sign(sdval) != np.sign(sd[i][0]) for sdval in sd[i,:]):
+                elems_to_refine.append(k)
             k = k + 1
         refined_topo = refined_topo.refined_by(refined_topo.transforms[np.array(elems_to_refine)])
     return refined_topo
 
 
-def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, label, nSamples, PLOT3D):
+def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, nSamples, PLOT3D, expr):
 
     # mat prop functions
     class PoissonRatio(function.Pointwise):
@@ -80,7 +81,6 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
             return E_air + (E_wall - E_air) * np.heaviside(x**2 + y**2 - ri**2 ,1) - (E_wall - E_air)*np.heaviside(x**2 + y**2 - ro**2 ,0)
         def _derivative(self, var, seen):
             return np.zeros(self.shape+var.shape)
-
 
     # thickness
     Navg = (Nx + Ny)/2
@@ -140,26 +140,31 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     omega.mu = 'E / (2 (1 + nu))'
     omega.lmbda = 'E nu / ( (1 + nu) (1 - 2 nu) )'
 
+
     # signed distance fields
+    omega.ri = ri
+    omega.ro = ro
     omega.sdfri = 'x_i x_i - ri^2'
-    omega.sdfwall = -1 + 2 * ( np.heaviside(x**2 + y**2 - ri**2 ,1) - np.heaviside(x**2 + y**2 - ro**2 ,0) )
+    omega.sdfro = 'x_i x_i - ro^2'
 
     # refine background topology for basis
     refined_omega_topo = RefineBySDF(omega_topo, omega.sdfri, nref)
+    #refined_omega_topo = RefineBySDF(refined_omega_topo, omega.sdfro, nref)
     omega.basis = refined_omega_topo.basis('th-spline', degree = basis_degree)
 
     # refine background topology for quadrature rule
-    refined_quadrature_topo = RefineBySDF(omega_topo, omega.sdfwall, nqref)
+    refined_quadrature_topo = RefineBySDF(refined_omega_topo, omega.sdfri, nqref)
+    refined_quadrature_topo = RefineBySDF(refined_quadrature_topo, omega.sdfro, nqref + nref)
     gauss_sample = refined_quadrature_topo.sample('gauss', gauss_degree)
 
     # Build Immersed Boundary Quadrature Rule
     degree_gamma = 1
-    sample_trimmed_gamma = gamma_topo.sample('gauss', degree_gamma)
-    sample_trimmed_omega = locatesample(sample_trimmed_gamma, gamma.x, omega_topo, omega.x,10000000000)
+    sample_gamma = gamma_topo.sample('gauss', degree_gamma)
+    sample_omega = locatesample(sample_gamma, gamma.x, refined_omega_topo, omega.x,1e-7)
 
     # Rebuild traction function on Omega
-    omega.traction = sample_trimmed_omega.asfunction(sample_trimmed_gamma.eval(gamma.traction))
-    omega.Jgamma = sample_trimmed_omega.asfunction(sample_trimmed_gamma.eval(function.J(gamma.x)))
+    omega.traction = sample_omega.asfunction(sample_gamma.eval(gamma.traction))
+    omega.Jgamma = sample_omega.asfunction(sample_gamma.eval(function.J(gamma.x)))
 
     omega.ubasis = omega.basis.vector(3)
     omega.u_i = 'ubasis_ni ?lhs_n'
@@ -178,22 +183,26 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
     omega.sigma_kl = 'stress_ij Qinv_kj Qinv_li '
     omega.du_i = 'Qinv_ij u_j'
     omega.eps_kl =  'strain_ij Qinv_kj Qinv_li '
+    omega.sigmatt = 'sigma_11'
+    omega.sigmarr = 'sigma_00'
+    omega.sigmazz = 'sigma_22'
+    omega.ur = 'du_0'
     
     # Stiffness Matrix
     K = gauss_sample.integral('ubasis_ni,j stress_ij d:x' @ omega)
 
     # Force Vector
-    F = sample_trimmed_omega.integral('traction_i Jgamma ubasis_ni' @ omega)
+    F = sample_omega.integral('traction_i Jgamma ubasis_ni' @ omega)
 
     # Constrain Omega
-    sqr  = omega_topo.boundary['left'].integral('u_0 u_0 d:x' @ omega, degree = 2*basis_degree)
-    sqr += omega_topo.boundary['bottom'].integral('u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
+    sqr  = refined_omega_topo.boundary['left'].integral('u_0 u_0 d:x' @ omega, degree = 2*basis_degree)
+    sqr += refined_omega_topo.boundary['bottom'].integral('u_1 u_1 d:x' @ omega, degree = 2*basis_degree)
 
     if BC_TYPE == "D":
-        sqr += omega_topo.boundary['top'].integral('( u_0 u_0 + u_1 u_1 ) d:x' @ omega, degree = 2*basis_degree)
-        sqr += omega_topo.boundary['right'].integral('( u_0 u_0 + u_1 u_1 ) d:x' @ omega, degree = 2*basis_degree)
+        sqr += refined_omega_topo.boundary['top'].integral('( u_0 u_0 + u_1 u_1 ) d:x' @ omega, degree = 2*basis_degree)
+        sqr += refined_omega_topo.boundary['right'].integral('( u_0 u_0 + u_1 u_1 ) d:x' @ omega, degree = 2*basis_degree)
 
-    sqr += omega_topo.integral('u_2 u_2 d:x' @ omega, degree = 2*basis_degree)
+    sqr += refined_omega_topo.integral('u_2 u_2 d:x' @ omega, degree = 2*basis_degree)
     cons = solver.optimize('lhs', sqr, droptol=1e-15, linsolver='cg', linatol=1e-10, linprecon='diag')
 
     # Initialize Residual Vector
@@ -224,54 +233,21 @@ def Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_deg
 
     # sample
     samplepts = topo.sample('gauss',1)
-    pltpts = locatesample(samplepts, ns.rgeom, omega_topo, omega.x, 10000000000)
-    r = samplepts.eval(ns.r)
-    vonmises = pltpts.eval(omega.vonmises, lhs=lhs)
-    meanstress = pltpts.eval(omega.meanstress, lhs=lhs)
-    ur = pltpts.eval(omega.du[0], lhs=lhs)
-    ut = pltpts.eval(omega.du[1], lhs=lhs)
-    uz = pltpts.eval(omega.du[2], lhs=lhs)
-    E = pltpts.eval(omega.E)
-    nu = pltpts.eval(omega.nu)
-    sigmarr = pltpts.eval('sigma_00' @ omega, lhs=lhs)
-    sigmatt = pltpts.eval('sigma_11' @ omega, lhs=lhs)
-    sigmazz = pltpts.eval('sigma_22' @ omega, lhs=lhs)
-    sigmart = pltpts.eval('sigma_01' @ omega, lhs=lhs)
-    sigmarz = pltpts.eval('sigma_02' @ omega, lhs=lhs)
-    sigmatz = pltpts.eval('sigma_12' @ omega, lhs=lhs)
-    epsrr = pltpts.eval('eps_00' @ omega, lhs=lhs)
-    epstt = pltpts.eval('eps_11' @ omega, lhs=lhs)
-    epszz = pltpts.eval('eps_22' @ omega, lhs=lhs)
-    epsrt = pltpts.eval('eps_01' @ omega, lhs=lhs)
-    epsrz = pltpts.eval('eps_02' @ omega, lhs=lhs)
-    epstz = pltpts.eval('eps_12' @ omega, lhs=lhs)
+    pltpts = locatesample(samplepts, ns.rgeom, refined_omega_topo, omega.x, 1e-7)
 
+    # evaluate expressions
     vals = {}
-    vals["vonmises"] = vonmises
-    vals["meanstress"] = meanstress
-    vals["ur"] = ur
-    vals["ut"] = ut
-    vals["uz"] = uz
-    vals["sigmarr"] = sigmarr
-    vals["sigmatt"] = sigmatt
-    vals["sigmazz"] = sigmazz
-    vals["sigmart"] = sigmart
-    vals["sigmarz"] = sigmarz
-    vals["sigmatz"] = sigmatz
-    vals["epsrr"] = epsrr
-    vals["epstt"] = epstt
-    vals["epszz"] = epszz
-    vals["epsrt"] = epsrt
-    vals["epsrz"] = epsrz
-    vals["epstz"] = epstz
+    for key in expr:
+        vals[key] = pltpts.eval(expr[key] @ omega, lhs=lhs)
 
-    print("finished case: " + label)
+    r = pltpts.eval(omega.r)
+
 
     return r, vals, residuals
 
 
 
-def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
+def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples, expr):
 
     # Exact Solutions
     s = function.Namespace()
@@ -295,26 +271,12 @@ def ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples):
     s.ur = 'd1 ( (pi / r ) + d2 r )'
     s.epsrr = '(- d1 pi / r^2) + d1 d2'
 
-    # Sample Exact Solutions
+    # evaluate expressions
     vals = {}
+    for key in expr:
+        vals[key] = samplepts.eval(expr[key] @ s)
+
     r = samplepts.eval(s.r)
-    vals["vonmises"] = samplepts.eval(s.vonmises)
-    vals["meanstress"] = samplepts.eval(s.meanstress)
-    vals["ur"] = samplepts.eval(s.ur)
-    vals["ut"] = np.zeros([nSamples])
-    vals["uz"] = np.zeros([nSamples])
-    vals["sigmarr"] = samplepts.eval(s.sigmarr)
-    vals["sigmatt"] = samplepts.eval(s.sigmatt)
-    vals["sigmazz"] = samplepts.eval(s.sigmazz)
-    vals["sigmart"] = np.zeros([nSamples])
-    vals["sigmarz"] = np.zeros([nSamples])
-    vals["sigmatz"] = np.zeros([nSamples])
-    vals["epsrr"] = samplepts.eval(s.epsrr)
-    vals["epstt"] = np.zeros([nSamples])
-    vals["epszz"] = np.zeros([nSamples])
-    vals["epsrt"] = np.zeros([nSamples])
-    vals["epsrz"] = np.zeros([nSamples])
-    vals["epstz"] = np.zeros([nSamples])
 
     return r, vals
 
@@ -347,21 +309,33 @@ def PlotResidual(res, model_problem_name, study_name, label):
     plt.close(fig)
 
 
-def Export(axs, figs, dir, titles, xlabels, ylabels):
-
+def Export(axs, figs, dir, titles, xlabels, ylabels, ylims):
+    i = 0
     for key in axs:
-        axs[key].set_title(titles[key])
-        axs[key].set_xlabel(xlabels[key])
-        axs[key].set_ylabel(ylabels[key])
+        title = "plot_" + str(i)
+        if key in titles:
+            title = titles[key]
+            axs[key].set_title(title)
+        if key in xlabels:
+            axs[key].set_xlabel(xlabels[key])
+        else:
+            axs[key].set_xlabel("r [mm]")
+        if key in ylabels:
+            axs[key].set_ylabel(ylabels[key])
+        else:
+            axs[key].set_ylabel("[MPa]")
         axs[key].legend()
+        if key in ylims:
+            axs[key].set_ylim(ylims[key])
         fdir = "Results/" + dir
-        fname = titles[key]
+        fname = title
         fext = ".png"
         fpath = fdir + "/" + fname + fext
         if not os.path.exists(fdir):
             os.makedirs(fdir)
         figs[key].savefig(fpath)
         print("saved /heartflow/" + fpath)
+        i = i + 1
 
 
 def CloseFigs(figs):
@@ -374,28 +348,107 @@ def Normalize(normalization_factors, vals):
             vals[key] /= normalization_factors[key]
     return vals
 
-
+def PlotExactCase(axs, plots, r, vals):
+    for key in axs:
+        line = axs[key].plot(r,vals[plots[key][0]],label="exact",color='black',linestyle='dashed')
+        for i in range(1, len(plots[key])):
+            axs[key].plot(r,vals[plots[key][i]],color='black',linestyle='dashed')
 def PlotCase(axs, plots, r, vals, case_name):
     for key in axs:
         line = axs[key].plot(r,vals[plots[key][0]],label=case_name)
         col = line[0].get_color()
-        for plot in range(1, len(plots[key])):
-            axs[key].plot(r,vals[plot],color=col)
-
+        for i in range(1, len(plots[key])):
+            axs[key].plot(r,vals[plots[key][i]],color=col)
 
 
 def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
     # study name
     study_name = "compressibility"
 
+    # inputs
+    PLOT3D = False
+    nSamples = 100
+
+    # define figures
+    plot_keys = ["stress", "sigmazz", "sigmatt", "sigmarr"]
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz_norm"] = "sigmazz / nu"
+
+    # Define plots
+    plots = {}
+    plots["stress"] = ["sigmatt", "sigmarr"]
+    plots["sigmazz"] = ["sigmazz_norm"]
+    plots["sigmatt"] = ["sigmatt"]
+    plots["sigmarr"] = ["sigmarr"]
+
+    # Y Labels - default [MPa]
+    ylabels = {}
+
+    # X Labels - default r [mm]
+    xlabels = {}
+
+    # Titles
+    titles = {}
+    titles["stress"] = "Stress Components"
+    titles["sigmazz"] = "Normalized Axial Stress"
+    titles["sigmatt"] = "Hoop Stress"
+    titles["sigmarr"] = "Radial Stress"
+
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall[0], E_wall, nSamples, expr)
+    PlotExactCase(axs, plots, r_exact, vals_exact)
+
+    # y axis limits
+    ylims = {}
+    ylims["sigmazz"] = axs["stress"].get_ylim()
+
+
+    # cases
+    ncases = len(nu_wall)
+    for i in range(ncases):
+        case_name = "$\\nu = $" + str(nu_wall[i])
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, nSamples, PLOT3D, expr)
+        PlotCase(axs, plots, r, vals, case_name)
+        print("finished case: " + case_name)
+
+    # export figures
+    dir = model_problem_name + "/" + study_name
+    Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+
+    # close figs
+    CloseFigs(figs)
+
+def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
+    # study name
+    study_name = "air_properties"
+
+    # inputs
+    PLOT3D = False
+    nSamples = 100
+
     # define figures
     plot_keys = ["stress", "disp"]
-    figs, axs = InitializePlots(keys)
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz"] = "sigmazz"
+    expr["ur"] = "ur"
 
     # Define plots
     plots = {}
     plots["stress"] = ["sigmatt", "sigmazz", "sigmarr"]
-    plots["disp"] = ["ur", "ut"]
+    plots["disp"] = ["ur"]
 
     # Y Labels
     ylabels = {}
@@ -410,27 +463,88 @@ def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
     # Titles
     titles = {}
     titles["stress"] = "Stress Components"
-    titles["disp"] = "Raidial Displacement"
+    titles["disp"] = "Radial Displacement"
 
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples, expr)
+    PlotExactCase(axs, plots, r_exact, vals_exact)
+
+    # y axis limits
+    ylims = {}
+
+    # cases
+    ncases = len(E_air)
+    for i in range(ncases):
+        case_name = "$E_{air} = $" + "{:.2e}".format(E_air[i] / E_wall) + "$E_{wall}$"
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air[i], ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, nSamples, PLOT3D, expr)
+        PlotCase(axs, plots, r, vals, case_name)
+        print("finished case: " + case_name)
+
+    # export figures
+    dir = model_problem_name + "/" + study_name
+    Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+
+    # close figs
+    CloseFigs(figs)
+
+def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
+    # study name
+    study_name = "local_refinement"
 
     # inputs
     PLOT3D = False
     nSamples = 100
 
+    # define figures
+    plot_keys = ["stress", "disp"]
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz"] = "sigmazz"
+    expr["ur"] = "ur"
+
+    # Define plots
+    plots = {}
+    plots["stress"] = ["sigmatt", "sigmazz", "sigmarr"]
+    plots["disp"] = ["ur"]
+
+    # Y Labels
+    ylabels = {}
+    ylabels["stress"] = "[MPa]"
+    ylabels["disp"] = "[mm]"
+
+    # X Labels
+    xlabels = {}
+    xlabels["stress"] = "r [mm]"
+    xlabels["disp"] = "r [mm]"
+
+    # Titles
+    titles = {}
+    titles["stress"] = "Stress Components"
+    titles["disp"] = "Radial Displacement"
+
     # exact solution
-    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples)
-    PlotCase(axs, plots, r_exact, vals_exact, "exact")
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples, expr)
+    PlotExactCase(axs, plots, r_exact, vals_exact)
+
+    # y axis limits
+    ylims = {}
 
     # cases
-    ncases = len(nu_wall)
+    ncases = len(nref)
     for i in range(ncases):
-        case_name = "$\\nu = $" + str(nu_wall[i])
-        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall[i], E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, label, nSamples, PLOT3D)
+        case_name = "$n = " + str(nref[i])
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref[i], nqref, BC_TYPE, nSamples, PLOT3D, expr)
         PlotCase(axs, plots, r, vals, case_name)
+        print("finished case: " + case_name)
 
     # export figures
     dir = model_problem_name + "/" + study_name
-    Export(axs, figs, dir, titles, xlabels, ylabels)
+    Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
 
     # close figs
     CloseFigs(figs)
@@ -442,7 +556,7 @@ def main():
     # DEFINE DEFAULT VALUES
 
     # model problem name
-    model_problem_name = "adaptive_lr_cylinder"
+    model_problem_name = "cylinder_adaptive_lr"
 
     # outer radius
     ro = 3.2 / 2
@@ -475,8 +589,8 @@ def main():
     L = 2 * ro
 
     # number voxels
-    Nx = 5
-    Ny = 5
+    Nx = 50
+    Ny = 50
 
     # number of plot sample points
     nSamples = 100
@@ -485,17 +599,26 @@ def main():
     BC_TYPE = "D"
 
     # nrefine for basis
-    nref = 2
+    nref = 1
 
     # nrefine for quadrature rule
-    nqref = 3
+    nqref = 4
 
     ########################################
 
     
     # Run studies
-    poisson_ratios = [0.3, 0.4, 0.45, 0.49]
-    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+    #poisson_ratios = [0.27, 0.4, 0.45, 0.48]
+    #CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+
+    #Ea = [1e-6 * E_wall, 1e-8 * E_wall, 1e-10 * E_wall]
+    #AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+
+    nrefine = [0,1,2]
+    nqrefine = 0
+    LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
+
+
 
 
 if __name__ == '__main__':
