@@ -5,3 +5,4 @@ data/*
 *.vtk
 *.[Pp][Nn][Gg]
 archive/*
+.ipynb_checkpoints
