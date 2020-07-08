@@ -487,6 +487,68 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
     # close figs
     CloseFigs(figs)
 
+def QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
+    # study name
+    study_name = "quadrature_refinement"
+
+    # inputs
+    PLOT3D = False
+    nSamples = 100
+
+    # define figures
+    plot_keys = ["stress", "disp"]
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz"] = "sigmazz"
+    expr["ur"] = "ur"
+
+    # Define plots
+    plots = {}
+    plots["stress"] = ["sigmatt", "sigmazz", "sigmarr"]
+    plots["disp"] = ["ur"]
+
+    # Y Labels
+    ylabels = {}
+    ylabels["stress"] = "[MPa]"
+    ylabels["disp"] = "[mm]"
+
+    # X Labels
+    xlabels = {}
+    xlabels["stress"] = "r [mm]"
+    xlabels["disp"] = "r [mm]"
+
+    # Titles
+    titles = {}
+    titles["stress"] = "Stress Components"
+    titles["disp"] = "Radial Displacement"
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples, expr)
+    PlotExactCase(axs, plots, r_exact, vals_exact)
+
+    # y axis limits
+    ylims = {}
+
+    # cases
+    ncases = len(nqref)
+    for i in range(ncases):
+        case_name = "$n = " + str(nqref[i])
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref[i], BC_TYPE, nSamples, PLOT3D, expr)
+        PlotCase(axs, plots, r, vals, case_name)
+        print("finished case: " + case_name)
+
+    # export figures
+    dir = model_problem_name + "/" + study_name
+    Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+
+    # close figs
+    CloseFigs(figs)
+
 def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
     # study name
     study_name = "local_refinement"
@@ -549,14 +611,74 @@ def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
     # close figs
     CloseFigs(figs)
 
+def BaseMeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
+    # study name
+    study_name = "base_mesh_refinement"
 
+    # inputs
+    PLOT3D = False
+    nSamples = 100
+
+    # define figures
+    plot_keys = ["stress", "disp"]
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz"] = "sigmazz"
+    expr["ur"] = "ur"
+
+    # Define plots
+    plots = {}
+    plots["stress"] = ["sigmatt", "sigmazz", "sigmarr"]
+    plots["disp"] = ["ur"]
+
+    # Y Labels
+    ylabels = {}
+    ylabels["stress"] = "[MPa]"
+    ylabels["disp"] = "[mm]"
+
+    # X Labels
+    xlabels = {}
+    xlabels["stress"] = "r [mm]"
+    xlabels["disp"] = "r [mm]"
+
+    # Titles
+    titles = {}
+    titles["stress"] = "Stress Components"
+    titles["disp"] = "Radial Displacement"
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples, expr)
+    PlotExactCase(axs, plots, r_exact, vals_exact)
+
+    # y axis limits
+    ylims = {}
+
+    # cases
+    ncases = len(Nx)
+    for i in range(ncases):
+        case_name = str(Nx[i]) + " X " + str(Ny[i]) + " X 1"
+        r, vals, res = Run(L, Nx[i], Ny[i], Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, nSamples, PLOT3D, expr)
+        PlotCase(axs, plots, r, vals, case_name)
+        print("finished case: " + case_name)
+
+    # export figures
+    dir = model_problem_name + "/" + study_name
+    Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+
+    # close figs
+    CloseFigs(figs)
 
 def main():
 
     # DEFINE DEFAULT VALUES
 
     # model problem name
-    model_problem_name = "cylinder_adaptive_lr"
+    model_problem_name = "adaptive_cylinder_lr"
 
     # outer radius
     ro = 3.2 / 2
@@ -589,8 +711,8 @@ def main():
     L = 2 * ro
 
     # number voxels
-    Nx = 50
-    Ny = 50
+    Nx = 25
+    Ny = 25
 
     # number of plot sample points
     nSamples = 100
@@ -614,11 +736,15 @@ def main():
     #Ea = [1e-6 * E_wall, 1e-8 * E_wall, 1e-10 * E_wall]
     #AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
 
-    nrefine = [0,1,2]
-    nqrefine = 0
+    nrefine = [1]
+    nqrefine = 4
     LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
 
+    #N = [50, 100, 150]
+    #BaseMeshRefinementStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, 0, 0, BC_TYPE, model_problem_name)
 
+    #nqrefine = [0,1,2]
+    #QuadratureRefinementStudy(L, 100, 100, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, 0, nqrefine, BC_TYPE, model_problem_name)
 
 
 if __name__ == '__main__':
