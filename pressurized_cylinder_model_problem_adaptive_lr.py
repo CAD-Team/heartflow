@@ -845,10 +845,6 @@ def main():
 
     N = [50,100]
     MeshRefinementStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
-<<<<<<< HEAD
-=======
-
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
 
 
 if __name__ == '__main__':

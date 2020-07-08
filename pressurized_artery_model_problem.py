@@ -2,6 +2,7 @@ from nutils import*
 from nutils.pointsseq import PointsSequence
 import numpy as np
 from matplotlib import pyplot as plt
+import os
 
 
 def locatesample(fromsample, fromgeom, totopo, togeom, tol, **kwargs):
@@ -280,6 +281,7 @@ def Run(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_de
     # thickness
     Navg = (Nx + Ny)/2
     t = L / (2 * Navg)
+    Nz = 1
 
     # background mesh
     omega = function.Namespace()
@@ -686,8 +688,8 @@ def main():
 
     # blood wall properties [mPa]
     nu_b =  0.0
-    G_b  =  .001
-    E_b = CalcYoungsModulus(G, nu)
+    G_b  =  .000001
+    E_b = CalcYoungsModulus(G_b, nu_b)
 
     # artery wall properties [mPa]
     nu_a =  0.3
@@ -732,7 +734,7 @@ def main():
     # Run studies
     nrefine = [0,1,2]
     nqrefine = [4,3,2]
-    LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nrefine, neqrefine, BC_TYPE, model_problem_name)
+    LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
 
     poisson_ratios = [0.27, 0.4, 0.45, 0.48]
     CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, poisson_ratios, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
