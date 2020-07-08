@@ -337,6 +337,29 @@ def Export(axs, figs, dir, titles, xlabels, ylabels, ylims):
         print("saved /heartflow/" + fpath)
         i = i + 1
 
+def WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir):
+    OUT_DIR = "Results/" + dir
+    if not os.path.exists(OUT_DIR):
+        os.makedirs(OUT_DIR)
+    path = OUT_DIR + "/" + "analysis_properties.txt"
+    f = open(path, "w+")
+    f.write(model_problem_name + "\n")
+    f.write("L = " + str(L )+ "\n")
+    f.write("(Nx, Ny, Nz) = " + str((Nx,Ny,1))+ "\n")
+    f.write("(Nu, Nv) = " + str((Nu,Nv))+ "\n")
+    f.write("nu_wall = " + str(nu_wall)+ "\n")
+    f.write("E_wall = " + str(E_wall)+ "\n")
+    f.write("nu_air = " + str(nu_air)+ "\n")
+    f.write("E_air = " + str(E_air)+ "\n")
+    f.write("(ri, ro) = " + str((ri, ro))+ "\n")
+    f.write("pi = " + str(pi)+ "\n")
+    f.write("basis degree = " + str(basis_degree)+ "\n")
+    f.write("gauss_degree = " + str(gauss_degree)+ "\n")
+    f.write("Levels of mesh refinement = " + str(nref)+ "\n")
+    f.write("Levels of quadrature refinement = " + str(nqref)+ "\n")
+    f.write("BC Type = " + str(BC_TYPE)+ "\n")
+    f.close()
+    print("saved /heartflow/" + path)
 
 def CloseFigs(figs):
     for key in figs:
@@ -361,10 +384,7 @@ def PlotCase(axs, plots, r, vals, case_name):
             axs[key].plot(r,vals[plots[key][i]],color=col)
 
 
-def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
-    # study name
-    study_name = "compressibility"
-
+def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "compressibility"):
     # inputs
     PLOT3D = False
     nSamples = 100
@@ -421,13 +441,12 @@ def CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
     # export figures
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+    WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
 
     # close figs
     CloseFigs(figs)
 
-def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
-    # study name
-    study_name = "air_properties"
+def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "air_properties"):
 
     # inputs
     PLOT3D = False
@@ -483,13 +502,12 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
     # export figures
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+    WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
 
     # close figs
     CloseFigs(figs)
 
-def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
-    # study name
-    study_name = "local_refinement"
+def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "local_refinement"):
 
     # inputs
     PLOT3D = False
@@ -538,18 +556,78 @@ def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
     ncases = len(nref)
     for i in range(ncases):
         case_name = "$n = " + str(nref[i])
-        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref[i], nqref, BC_TYPE, nSamples, PLOT3D, expr)
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref[i], nqref[i], BC_TYPE, nSamples, PLOT3D, expr)
         PlotCase(axs, plots, r, vals, case_name)
         print("finished case: " + case_name)
 
     # export figures
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+    WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
 
     # close figs
     CloseFigs(figs)
 
+def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "mesh_refinement"):
 
+    # inputs
+    PLOT3D = False
+    nSamples = 100
+
+    # define figures
+    plot_keys = ["stress", "disp"]
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz"] = "sigmazz"
+    expr["ur"] = "ur"
+
+    # Define plots
+    plots = {}
+    plots["stress"] = ["sigmatt", "sigmazz", "sigmarr"]
+    plots["disp"] = ["ur"]
+
+    # Y Labels
+    ylabels = {}
+    ylabels["stress"] = "[MPa]"
+    ylabels["disp"] = "[mm]"
+
+    # X Labels
+    xlabels = {}
+    xlabels["stress"] = "r [mm]"
+    xlabels["disp"] = "r [mm]"
+
+    # Titles
+    titles = {}
+    titles["stress"] = "Stress Components"
+    titles["disp"] = "Radial Displacement"
+
+    # exact solution
+    r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples, expr)
+    PlotExactCase(axs, plots, r_exact, vals_exact)
+
+    # y axis limits
+    ylims = {}
+
+    # cases
+    ncases = len(Nx)
+    for i in range(ncases):
+        case_name = "$N_{x} \\times N_{y} \\times N_{z}$ = " + str((Nx[i],Ny[i],1))
+        r, vals, res = Run(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref[i], nqref[i], BC_TYPE, nSamples, PLOT3D, expr)
+        PlotCase(axs, plots, r, vals, case_name)
+        print("finished case: " + case_name)
+
+    # export figures
+    dir = model_problem_name + "/" + study_name
+    Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+    WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
+
+    # close figs
+    CloseFigs(figs)
 
 def main():
 
@@ -589,8 +667,8 @@ def main():
     L = 2 * ro
 
     # number voxels
-    Nx = 50
-    Ny = 50
+    Nx = 25
+    Ny = 25
 
     # number of plot sample points
     nSamples = 100
@@ -608,16 +686,18 @@ def main():
 
     
     # Run studies
-    #poisson_ratios = [0.27, 0.4, 0.45, 0.48]
-    #CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+    poisson_ratios = [0.27, 0.4, 0.45, 0.48]
+    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
 
-    #Ea = [1e-6 * E_wall, 1e-8 * E_wall, 1e-10 * E_wall]
-    #AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+    Ea = [1e-6 * E_wall, 1e-8 * E_wall, 1e-10 * E_wall]
+    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
 
     nrefine = [0,1,2]
-    nqrefine = 0
+    nqrefine = [4,3,2]
     LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
 
+    N = [50,100]
+    MeshRefinementStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
 
 
 
