@@ -503,6 +503,7 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
     WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
+<<<<<<< HEAD
 
     # close figs
     CloseFigs(figs)
@@ -566,13 +567,19 @@ def QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air,
     # export figures
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+=======
+>>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
 
     # close figs
     CloseFigs(figs)
 
+<<<<<<< HEAD
 def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
     # study name
     study_name = "local_refinement"
+=======
+def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "local_refinement"):
+>>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
 =======
 def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "local_refinement"):
 >>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
@@ -637,9 +644,13 @@ def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
     CloseFigs(figs)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 def BaseMeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
     # study name
     study_name = "base_mesh_refinement"
+=======
+def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "mesh_refinement"):
+>>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
 =======
 def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "mesh_refinement"):
 >>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
@@ -647,6 +658,7 @@ def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     # inputs
     PLOT3D = False
     nSamples = 100
+<<<<<<< HEAD
 
     # define figures
     plot_keys = ["stress", "disp"]
@@ -702,6 +714,31 @@ def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
 
 =======
 
+=======
+
+    # define figures
+    plot_keys = ["stress", "disp"]
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz"] = "sigmazz"
+    expr["ur"] = "ur"
+
+    # Define plots
+    plots = {}
+    plots["stress"] = ["sigmatt", "sigmazz", "sigmarr"]
+    plots["disp"] = ["ur"]
+
+    # Y Labels
+    ylabels = {}
+    ylabels["stress"] = "[MPa]"
+    ylabels["disp"] = "[mm]"
+
+>>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
     # X Labels
     xlabels = {}
     xlabels["stress"] = "r [mm]"
@@ -732,6 +769,9 @@ def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
     WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
 
+<<<<<<< HEAD
+>>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
+=======
 >>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
     # close figs
     CloseFigs(figs)
@@ -805,6 +845,10 @@ def main():
 
     N = [50,100]
     MeshRefinementStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
 
 
 if __name__ == '__main__':
