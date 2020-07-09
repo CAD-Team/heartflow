@@ -545,7 +545,66 @@ def PlotCase(axs, plots, r, vals, case_name):
         for i in range(1, len(plots[key])):
             axs[key].plot(r,vals[plots[key][i]],color=col)
 
+def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "mesh_refinement"):
 
+    # inputs
+    PLOT3D = False
+    nSamples = 100
+
+    # define figures
+    plot_keys = ["stress", "disp"]
+    figs, axs = InitializePlots(plot_keys)
+
+    # Define Function Expressions to sample
+    expr = {}
+    expr["r"] = "r"
+    expr["sigmatt"] = "sigmatt"
+    expr["sigmarr"] = "sigmarr"
+    expr["sigmazz"] = "sigmazz"
+    expr["ur"] = "ur"
+
+    # Define plots
+    plots = {}
+    plots["stress"] = ["sigmatt", "sigmazz", "sigmarr"]
+    plots["disp"] = ["ur"]
+
+    # Y Labels
+    ylabels = {}
+    ylabels["stress"] = "[MPa]"
+    ylabels["disp"] = "[mm]"
+
+    # X Labels
+    xlabels = {}
+    xlabels["stress"] = "r [mm]"
+    xlabels["disp"] = "r [mm]"
+
+    # Titles
+    titles = {}
+    titles["stress"] = "Stress Components"
+    titles["disp"] = "Radial Displacement"
+
+    # exact solution
+    # r_exact, vals_exact = ExactSolution(ri, ro, pi, nu_wall, E_wall, nSamples, expr)
+    # PlotExactCase(axs, plots, r_exact, vals_exact)
+
+    # y axis limits
+    ylims = {}
+
+    # cases
+    ncases = len(Nx)
+    for i in range(ncases):
+        case_name = "$N_{x} \\times N_{y}$ = " + str(Nx[i]) + "$ \\times$ " + str(Ny[i])
+        r, vals, res = Run(L, Nx[i], Ny[i], Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, nSamples, PLOT3D, expr)
+        PlotCase(axs, plots, r, vals, case_name)
+        print("finished case: " + case_name)
+
+    # export figures
+    dir = model_problem_name + "/" + study_name
+    Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
+    WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
+
+    # close figs
+    CloseFigs(figs)
 
 def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "local_refinement"):
 
@@ -732,12 +791,15 @@ def main():
 
     
     # Run studies
-    nrefine = [0,1,2]
-    nqrefine = [4,3,2]
-    LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
+    N = [25,50,100]
+    MeshRefinementStudy(L, N, N, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
 
-    poisson_ratios = [0.27, 0.4, 0.45, 0.48]
-    CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, poisson_ratios, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+    #nrefine = [0,1,2]
+    #nqrefine = [4,3,2]
+    #LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, nu_h, E_h, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
+
+    #poisson_ratios = [0.27, 0.4, 0.45, 0.48]
+    #CompressibilityStudy(L, Nx, Ny, Nu, Nv, nu_b, E_b, nu_a, E_a, poisson_ratios, E_h, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
 
 
 
