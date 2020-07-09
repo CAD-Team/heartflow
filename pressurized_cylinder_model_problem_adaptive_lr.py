@@ -503,16 +503,11 @@ def AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
     WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
-<<<<<<< HEAD
 
     # close figs
     CloseFigs(figs)
 
-<<<<<<< HEAD
-def QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
-    # study name
-    study_name = "quadrature_refinement"
-
+def QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name="quadrature_refinement"):
     # inputs
     PLOT3D = False
     nSamples = 100
@@ -567,22 +562,12 @@ def QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air,
     # export figures
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
-=======
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
+    WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
 
     # close figs
     CloseFigs(figs)
 
-<<<<<<< HEAD
-def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
-    # study name
-    study_name = "local_refinement"
-=======
 def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "local_refinement"):
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
-=======
-def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "local_refinement"):
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
 
     # inputs
     PLOT3D = False
@@ -643,22 +628,12 @@ def LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, 
     # close figs
     CloseFigs(figs)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-def BaseMeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name):
-    # study name
-    study_name = "base_mesh_refinement"
-=======
+
 def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "mesh_refinement"):
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
-=======
-def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, study_name = "mesh_refinement"):
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
 
     # inputs
     PLOT3D = False
     nSamples = 100
-<<<<<<< HEAD
 
     # define figures
     plot_keys = ["stress", "disp"]
@@ -681,7 +656,6 @@ def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     ylabels = {}
     ylabels["stress"] = "[MPa]"
     ylabels["disp"] = "[mm]"
-<<<<<<< HEAD
 
     # X Labels
     xlabels = {}
@@ -712,10 +686,6 @@ def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     dir = model_problem_name + "/" + study_name
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
 
-=======
-
-=======
-
     # define figures
     plot_keys = ["stress", "disp"]
     figs, axs = InitializePlots(plot_keys)
@@ -738,7 +708,6 @@ def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     ylabels["stress"] = "[MPa]"
     ylabels["disp"] = "[mm]"
 
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
     # X Labels
     xlabels = {}
     xlabels["stress"] = "r [mm]"
@@ -769,10 +738,6 @@ def MeshRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, r
     Export(axs, figs, dir, titles, xlabels, ylabels, ylims)
     WriteAnalysisProperties(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name, dir)
 
-<<<<<<< HEAD
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
-=======
->>>>>>> 7b7b9098a17434c7c7f5298a5df817b71bedcbeb
     # close figs
     CloseFigs(figs)
 
@@ -814,8 +779,8 @@ def main():
     L = 2 * ro
 
     # number voxels
-    Nx = 25
-    Ny = 25
+    Nx = 30
+    Ny = 30
 
     # number of plot sample points
     nSamples = 100
@@ -830,21 +795,24 @@ def main():
     nqref = 4
 
     ########################################
-
     
     # Run studies
-    poisson_ratios = [0.27, 0.4, 0.45, 0.48]
-    CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+    nqrefine = [5]
+    for i in range(len(nqrefine)):
+        QuadratureRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, 1, [nqrefine[i]], BC_TYPE, model_problem_name, study_name="quadrature_refinement_lr" + str(nqrefine[i]))
 
-    Ea = [1e-6 * E_wall, 1e-8 * E_wall, 1e-10 * E_wall]
-    AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
+    #poisson_ratios = [0.27, 0.4, 0.45, 0.48]
+    #CompressibilityStudy(L, Nx, Ny, Nu, Nv, poisson_ratios, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
 
-    nrefine = [0,1,2]
-    nqrefine = [4,3,2]
-    LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
+    #Ea = [1e-6 * E_wall, 1e-8 * E_wall, 1e-10 * E_wall]
+    #AirPropertiesStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, Ea, ri, ro, pi, basis_degree, gauss_degree, nref, nqref, BC_TYPE, model_problem_name)
 
-    N = [50,100]
-    MeshRefinementStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
+    #nrefine = [0,1,2]
+    #nqrefine = [4,3,2]
+    #LocalRefinementStudy(L, Nx, Ny, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
+
+    #N = [50,100]
+    #MeshRefinementStudy(L, N, N, Nu, Nv, nu_wall, E_wall, nu_air, E_air, ri, ro, pi, basis_degree, gauss_degree, nrefine, nqrefine, BC_TYPE, model_problem_name)
 
 
 if __name__ == '__main__':
