@@ -782,10 +782,10 @@ def main():
     BC_TYPE = "D"
 
     # nrefine for basis
-    nref = 1
+    nref = 0
 
     # nrefine for quadrature rule
-    nqref = 4
+    nqref = 0
 
     ########################################
 

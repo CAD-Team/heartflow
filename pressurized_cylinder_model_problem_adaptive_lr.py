@@ -779,8 +779,8 @@ def main():
     L = 2 * ro
 
     # number voxels
-    Nx = 30
-    Ny = 30
+    Nx = 50
+    Ny = 50
 
     # number of plot sample points
     nSamples = 100
