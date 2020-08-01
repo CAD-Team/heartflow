@@ -1,0 +1,24 @@
+TODO:
+
+07/22/2020
+
+Discussion:
+we need to find a different way of loading the artery.
+Based on the boundary fitted approach results, we are seeing oscillations that didnt appear in the pressurized cylinder case.
+this suggests the way we are loading (delta functions) is not good.
+
+TODO:
+- Change to discontinuous mat props at the interfaces.
+- equivalent body force (pressurize the blood - with exactly the same pressure value)
+		pressure = F/m^2, body force = F/m^3
+		n_i p w -> p div u
+- tomorrow 1pm ++
+
+
+
+
+07/30/2020
+
+- p=2, with plotting, incrased integration
+- p=1
+- blending mesh (2d bilinear?)

@@ -4,5 +4,5 @@ data/*
 *_ignore_*
 *.vtk
 *.[Pp][Nn][Gg]
-archive/*
+.archive/*
 .ipynb_checkpoints
