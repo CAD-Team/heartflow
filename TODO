@@ -22,3 +22,11 @@ TODO:
 - p=2, with plotting, incrased integration
 - p=1
 - blending mesh (2d bilinear?)
+
+
+
+08/06/2020
+- MAke E3 -> air
+- rerun problems with / without mesh / quad refinement
+- rerun with dirichlet instead of neumann on outside.
+- test different immersed boudnary mesh elems
