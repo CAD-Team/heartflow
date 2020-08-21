@@ -30,3 +30,6 @@ TODO:
 - rerun problems with / without mesh / quad refinement
 - rerun with dirichlet instead of neumann on outside.
 - test different immersed boudnary mesh elems
+
+
+08/21/2020
