@@ -6,3 +6,9 @@ data/*
 *.[Pp][Nn][Gg]
 .archive/*
 .ipynb_checkpoints
+Model_00_slice_00/data/
+*.vtu
+*.mha
+Model_00_slice_00/data/autoplaque.mha
+Model_00_slice_00/data/flow_sim.vtu
+*.mha
